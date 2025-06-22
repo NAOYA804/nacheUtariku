@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Youtube, FileText, Sun, Moon } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, get, onValue } from 'firebase/database';
-
-// Firebaseインスタンスを保持する変数
-let firebaseAppInstance = null;
-let firebaseDatabaseInstance = null;
 
 export default function SimpleRequestApp() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -14,7 +8,6 @@ export default function SimpleRequestApp() {
   const [passwordError, setPasswordError] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [songs, setSongs] = useState([]);
-  const [realtimeListener, setRealtimeListener] = useState(null);
 
   const [adminMessage, setAdminMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,338 +47,37 @@ export default function SimpleRequestApp() {
     { id: 6, title: 'Pretender', titleFurigana: 'プリテンダー', artist: 'Official髭男dism', artistFurigana: 'オフィシャルひげだんディズム', genre: 'J-POP', tags: ['ロック'], youtubeUrl: '', memo: '', copyCount: 10 }
   ];
 
-  // Firebase設定（実際の環境で使用）
-  const getFirebaseConfig = () => {
-    try {
-      // ブラウザ環境チェック
-      if (typeof window === 'undefined') {
-        console.log('Server environment - Firebase not available');
-        return null;
-      }
+  // localStorageの代わりにメモリ内データを使用
+  const [inMemoryData, setInMemoryData] = useState({
+    songs: initialSongs,
+    publishedSongs: initialSongs,
+    adminMessage: '配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪'
+  });
 
-      // 実際のFirebase設定
-      const config = {
-        apiKey: "YOUR_ACTUAL_API_KEY_HERE", // 👈 Firebase Consoleからコピー
-        authDomain: "song-request-app-a590c.firebaseapp.com", // 👈 あなたのプロジェクトIDに合わせる
-        projectId: "song-request-app-a590c", // 👈 あなたのプロジェクトID
-        storageBucket: "song-request-app-a590c.appspot.com", // 👈 あなたのプロジェクトIDに合わせる
-        messagingSenderId: "YOUR_ACTUAL_MESSAGING_SENDER_ID_HERE", // 👈 Firebase Consoleからコピー
-        appId: "YOUR_ACTUAL_APP_ID_HERE", // 👈 Firebase Consoleからコピー
-        databaseURL: "https://song-request-app-a590c-default-rtdb.asia-southeast1.firebasedatabase.app" // 👈 あなたのDBのURL
-      };
-
-      // 設定値の存在確認
-      if (!config.apiKey || config.apiKey.includes('YOUR_ACTUAL_API_KEY_HERE')) {
-        console.warn('Firebase config contains placeholder values - Please update them!');
-        return null;
-      }
-
-      return config;
-    } catch (error) {
-      console.error('Error getting Firebase config:', error);
-      return null;
-    }
-  };
-
-  // Firebase操作（実際の環境で使用するコード）
-  const firebaseAPI = {
-    // Firebase初期化
-    initialize: async () => {
-      try {
-        const config = getFirebaseConfig();
-        if (!config) {
-          console.log('Firebase設定が無効です - ローカルストレージを使用');
-          return false;
-        }
-
-        // --- ここから実際のFirebase初期化コード ---
-        if (!firebaseAppInstance) { // アプリがまだ初期化されていなければ
-          firebaseAppInstance = initializeApp(config);
-        }
-        if (!firebaseDatabaseInstance) { // データベースがまだ取得されていなければ
-          firebaseDatabaseInstance = getDatabase(firebaseAppInstance);
-        }
-        console.log('Firebase初期化完了');
-        // --- ここまで ---
-        
-        return true;
-      } catch (error) {
-        console.error('Firebase初期化エラー:', error);
-        return false;
-      }
-    },
-
-    // データ保存
-    saveData: async (type, data) => {
-      try {
-        if (!firebaseDatabaseInstance) { // DBインスタンスがない場合はエラー
-          console.warn('Firebase Database is not initialized. Cannot save data.');
-          throw new Error('Firebase Database not initialized.');
-        }
-        // --- ここから実際のデータ保存コード ---
-        await set(ref(firebaseDatabaseInstance, type), data);
-        console.log(`${type}をFirebaseに保存しました`);
-        // --- ここまで ---
-        return true;
-      } catch (error) {
-        console.error(`Firebase保存エラー (${type}):`, error);
-        throw error;
-      }
-    },
-
-    // データ読み込み
-    loadData: async (type) => {
-      try {
-        if (!firebaseDatabaseInstance) { // DBインスタンスがない場合はエラー
-          console.warn('Firebase Database is not initialized. Cannot load data.');
-          return null;
-        }
-        // --- ここから実際のデータ読み込みコード ---
-        const snapshot = await get(ref(firebaseDatabaseInstance, type));
-        if (snapshot.exists()) {
-          return snapshot.val();
-        }
-        // --- ここまで ---
-        return null; // データが存在しない場合
-      } catch (error) {
-        console.error(`Firebase読み込みエラー (${type}):`, error);
-        throw error;
-      }
-    },
-
-    // リアルタイムリスナー設定
-    setupRealtimeListener: (callback) => {
-      try {
-        if (!firebaseDatabaseInstance) { // DBインスタンスがない場合はエラー
-          console.warn('Firebase Database is not initialized. Cannot set up listener.');
-          return null;
-        }
-        // --- ここから実際のリアルタイムリスナーコード ---
-        const songsRef = ref(firebaseDatabaseInstance, 'songs');
-        const publishedSongsRef = ref(firebaseDatabaseInstance, 'publishedSongs');
-        const adminMessageRef = ref(firebaseDatabaseInstance, 'adminMessage');
-        
-        // 各データパスに対してonValueリスナーを設定
-        const unsubscribeSongs = onValue(songsRef, (snapshot) => {
-          if (snapshot.exists()) {
-            callback('songs', snapshot.val());
-          }
-        }, (error) => console.error("Songs listener error:", error));
-        
-        const unsubscribePublished = onValue(publishedSongsRef, (snapshot) => {
-          if (snapshot.exists()) {
-            callback('publishedSongs', snapshot.val());
-          }
-        }, (error) => console.error("Published Songs listener error:", error));
-        
-        const unsubscribeMessage = onValue(adminMessageRef, (snapshot) => {
-          if (snapshot.exists()) {
-            callback('adminMessage', snapshot.val());
-          }
-        }, (error) => console.error("Admin Message listener error:", error));
-        
-        // すべてのリスナーを解除するための関数を返す
-        return () => {
-          unsubscribeSongs();
-          unsubscribePublished();
-          unsubscribeMessage();
-          console.log('リアルタイムリスナーをすべて解除しました');
-        };
-        // --- ここまで ---
-      } catch (error) {
-        console.error('リアルタイムリスナー設定エラー:', error);
-        return null;
-      }
-    },
-
-    // リアルタイムリスナー解除
-    removeRealtimeListener: (unsubscribe) => {
-      try {
-        if (unsubscribe) {
-          unsubscribe(); // setupRealtimeListenerが返した解除関数を呼び出す
-          console.log('リアルタイムリスナーを解除しました');
-        }
-      } catch (error) {
-        console.error('リアルタイムリスナー解除エラー:', error);
-      }
-    }
-  };
-
-  // 安全なlocalStorage操作関数
-  const safeLocalStorage = {
-    getItem: (key, defaultValue = null) => {
-      try {
-        if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-          return defaultValue;
-        }
-        const item = localStorage.getItem(key);
-        return item !== null ? JSON.parse(item) : defaultValue;
-      } catch (error) {
-        console.error(`Error getting localStorage item ${key}:`, error);
-        return defaultValue;
-      }
-    },
-    
-    setItem: (key, value) => {
-      try {
-        if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-          return false;
-        }
-        localStorage.setItem(key, JSON.stringify(value));
-        return true;
-      } catch (error) {
-        console.error(`Error setting localStorage item ${key}:`, error);
-        return false;
-      }
-    }
-  };
-
-  // データ読み込み（localStorage優先、Firebase補完）+ リアルタイム同期開始
-  const loadData = async () => {
-    try {
-      // まずlocalStorageからデータを読み込み（ページ更新時のデータ保持）
-      const localData = loadFromLocalStorage();
-      setSongs(localData.songs);
-      setPublishedSongs(localData.publishedSongs);
-      setAdminMessage(localData.adminMessage);
-
-      // Firebase接続を試行（バックグラウンド）
-      const connected = await firebaseAPI.initialize();
-      
-      if (connected) {
-        console.log('Firebase接続成功 - リアルタイム同期を開始');
-        
-        // Firebaseからデータを読み込み（存在する場合は更新）
-        try {
-          const firebaseSongs = await firebaseAPI.loadData('songs');
-          const firebasePublishedSongs = await firebaseAPI.loadData('publishedSongs');
-          const firebaseAdminMessage = await firebaseAPI.loadData('adminMessage');
-
-          // Firebaseにデータが存在する場合は更新
-          if (firebaseSongs) {
-            setSongs(firebaseSongs);
-            safeLocalStorage.setItem('songs', firebaseSongs);
-          }
-          if (firebasePublishedSongs) {
-            setPublishedSongs(firebasePublishedSongs);
-            safeLocalStorage.setItem('publishedSongs', firebasePublishedSongs);
-          }
-          if (firebaseAdminMessage) {
-            setAdminMessage(firebaseAdminMessage);
-            safeLocalStorage.setItem('adminMessage', firebaseAdminMessage);
-          }
-        } catch (loadError) {
-          console.warn('Firebase読み込みエラー - ローカルデータを使用:', loadError);
-        }
-
-        // リアルタイム同期リスナーを設定（他のクライアントからの変更のみ受信）
-        const unsubscribe = firebaseAPI.setupRealtimeListener((type, data) => {
-          console.log(`リアルタイム同期: ${type}が他のクライアントで更新されました`);
-          switch (type) {
-            case 'songs':
-              setSongs(data);
-              safeLocalStorage.setItem('songs', data);
-              break;
-            case 'publishedSongs':
-              setPublishedSongs(data);
-              safeLocalStorage.setItem('publishedSongs', data);
-              break;
-            case 'adminMessage':
-              setAdminMessage(data);
-              safeLocalStorage.setItem('adminMessage', data);
-              break;
-          }
-        });
-        setRealtimeListener(unsubscribe);
-      } else {
-        console.log('Firebase接続失敗 - ローカルストレージのみ使用');
-      }
-    } catch (error) {
-      console.error('データ読み込みエラー:', error);
-      // エラー時は既存のlocalStorageデータを保持、なければ初期データ
-      const localData = loadFromLocalStorage();
-      if (localData.songs.length === 0) {
-        setSongs(initialSongs);
-        setPublishedSongs(initialSongs);
-        setAdminMessage('配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪');
-      }
-    }
-  };
-
-  // localStorageからデータを読み込む関数
-  const loadFromLocalStorage = () => {
-    try {
-      const storedSongs = safeLocalStorage.getItem('songs', null);
-      const storedPublishedSongs = safeLocalStorage.getItem('publishedSongs', null);
-      const storedAdminMessage = safeLocalStorage.getItem('adminMessage', null);
-      
-      return {
-        songs: storedSongs || initialSongs,
-        publishedSongs: storedPublishedSongs || initialSongs,
-        adminMessage: storedAdminMessage || '配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪'
-      };
-    } catch (error) {
-      console.error('localStorage読み込みエラー:', error);
-      return {
-        songs: initialSongs,
-        publishedSongs: initialSongs,
-        adminMessage: '配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪'
-      };
-    }
-  };
-
-  // データ保存（Firebase優先、フォールバックでlocalStorage）+ リアルタイム同期
-  const saveData = async (type, data) => {
-    try {
-      // まずlocalStorageに即座に保存（レスポンス性確保）
-      safeLocalStorage.setItem(type, data);
-      
-      // Firebaseに保存（他のクライアントにリアルタイム同期される）
-      await firebaseAPI.saveData(type, data);
-    } catch (error) {
-      console.warn(`Firebase保存エラー (${type}) - ローカルストレージのみ使用:`, error);
-      // Firebase保存が失敗してもlocalStorageには保存済みなので継続
-    }
-  };
-
-  // 初期化時にデータを読み込み
+  // 初期化時にメモリからデータを読み込み
   useEffect(() => {
-    loadData();
-    
-    // クリーンアップ関数：コンポーネントのアンマウント時にリアルタイムリスナーを解除
-    return () => {
-      if (realtimeListener) {
-        firebaseAPI.removeRealtimeListener(realtimeListener);
-      }
-    };
+    setSongs(inMemoryData.songs);
+    setPublishedSongs(inMemoryData.publishedSongs);
+    setAdminMessage(inMemoryData.adminMessage);
   }, []);
 
-  // リアルタイムリスナーのクリーンアップ
-  useEffect(() => {
-    return () => {
-      if (realtimeListener) {
-        firebaseAPI.removeRealtimeListener(realtimeListener);
-      }
-    };
-  }, [realtimeListener]);
-
-  // データが変更されたときに保存
+  // songsが変更されたときにメモリに保存
   useEffect(() => {
     if (songs.length > 0) {
-      saveData('songs', songs);
+      setInMemoryData(prev => ({ ...prev, songs }));
     }
   }, [songs]);
 
+  // publishedSongsが変更されたときにメモリに保存
   useEffect(() => {
     if (publishedSongs.length > 0) {
-      saveData('publishedSongs', publishedSongs);
+      setInMemoryData(prev => ({ ...prev, publishedSongs }));
     }
   }, [publishedSongs]);
 
+  // adminMessageが変更されたときにメモリに保存
   useEffect(() => {
-    if (adminMessage) {
-      saveData('adminMessage', adminMessage);
-    }
+    setInMemoryData(prev => ({ ...prev, adminMessage }));
   }, [adminMessage]);
 
   const allTags = [...new Set(songs.flatMap(song => song.tags || []))].sort();
@@ -789,218 +481,7 @@ export default function SimpleRequestApp() {
                   <Search className={`absolute left-2 top-2 w-4 h-4 ${isDarkMode ? 'text-white/50' : 'text-gray-400'}`} />
                   <input
                     type="text"
-                    placeholder="https://www.youtube.com/watch?v=..."
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
-                  <textarea
-                    value={editingSong.memo}
-                    onChange={(e) => setEditingSong({...editingSong, memo: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="メモがあれば入力"
-                    rows="2"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={saveEditedSong}
-                  disabled={!editingSong.title || !editingSong.artist}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded text-sm font-medium"
-                >
-                  保存
-                </button>
-                <button
-                  onClick={closeEditModal}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md max-h-[90vh] overflow-y-auto">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲追加</h3>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
-                  <input
-                    type="text"
-                    value={newSong.title}
-                    onChange={(e) => setNewSong({...newSong, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="楽曲名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名（ふりがな）</label>
-                  <input
-                    type="text"
-                    value={newSong.titleFurigana}
-                    onChange={(e) => setNewSong({...newSong, titleFurigana: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="がくきょくめい"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
-                  <input
-                    type="text"
-                    value={newSong.artist}
-                    onChange={(e) => setNewSong({...newSong, artist: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="アーティスト名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名（ふりがな）</label>
-                  <input
-                    type="text"
-                    value={newSong.artistFurigana}
-                    onChange={(e) => setNewSong({...newSong, artistFurigana: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="あーてぃすとめい"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
-                  <div className="flex space-x-2">
-                    <select
-                      value={newSong.genre}
-                      onChange={(e) => setNewSong({...newSong, genre: e.target.value})}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                      <option value="">ジャンルを選択</option>
-                      {availableGenres.map(genre => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="新しいジャンル"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && e.target.value.trim()) {
-                          addGenre(e.target.value.trim());
-                          setNewSong({...newSong, genre: e.target.value.trim()});
-                          e.target.value = '';
-                        }
-                      }}
-                      className="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ（スペース区切り）</label>
-                  <input
-                    type="text"
-                    value={newSong.tags.join(' ')}
-                    onChange={(e) => setNewSong({...newSong, tags: e.target.value.split(' ').filter(tag => tag.trim())})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="バラード ロック"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
-                  <input
-                    type="text"
-                    value={newSong.youtubeUrl}
-                    onChange={(e) => setNewSong({...newSong, youtubeUrl: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="https://www.youtube.com/watch?v=..."
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
-                  <textarea
-                    value={newSong.memo}
-                    onChange={(e) => setNewSong({...newSong, memo: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="メモがあれば入力"
-                    rows="2"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={addSong}
-                  disabled={!newSong.title || !newSong.artist}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded text-sm font-medium"
-                >
-                  追加
-                </button>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showBulkAddModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲一括追加</h3>
-              
-              <div className="mb-4 p-3 bg-blue-50 rounded text-sm text-gray-700">
-                <p className="font-medium mb-2">入力形式：</p>
-                <p className="mb-1">1行に1曲、楽曲名のみ、または「楽曲名, アーティスト名」で入力してください。</p>
-                <p className="text-xs text-gray-600 mt-2">
-                  ※アーティスト名を省略した場合は「不明」として登録されます。詳細は編集ボタンで後から設定できます。
-                </p>
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">楽曲データ</label>
-                <textarea
-                  value={bulkAddText}
-                  onChange={(e) => setBulkAddText(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
-                  placeholder="例：夜に駆ける, YOASOBI&#10;香水, 瑛人&#10;残酷な天使のテーゼ, 高橋洋子"
-                  rows="8"
-                />
-              </div>
-              
-              <div className="flex space-x-2">
-                <button
-                  onClick={addBulkSongs}
-                  disabled={!bulkAddText.trim()}
-                  className="flex-1 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded text-sm font-medium"
-                >
-                  一括追加
-                </button>
-                <button
-                  onClick={() => setShowBulkAddModal(false)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}="楽曲名、アーティスト名、ヨミガナ、ジャンル、タグ、メモで検索..."
+                    placeholder="楽曲名、アーティスト名、ヨミガナ、ジャンル、タグ、メモで検索..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className={`w-full pl-8 pr-3 py-2 ${currentTheme.inputBg} border rounded ${currentTheme.inputText} focus:outline-none focus:ring-2 ${currentTheme.inputFocus} text-sm`}
@@ -1328,99 +809,319 @@ export default function SimpleRequestApp() {
         )}
 
         {showEditModal && editingSong && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md my-8 max-h-none"
+                 style={{maxHeight: 'calc(100vh - 64px)'}}>
               <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲編集</h3>
               
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
-                  <input
-                    type="text"
-                    value={editingSong.title}
-                    onChange={(e) => setEditingSong({...editingSong, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="楽曲名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名（ふりがな）</label>
-                  <input
-                    type="text"
-                    value={editingSong.titleFurigana}
-                    onChange={(e) => setEditingSong({...editingSong, titleFurigana: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="がくきょくめい"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
-                  <input
-                    type="text"
-                    value={editingSong.artist}
-                    onChange={(e) => setEditingSong({...editingSong, artist: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="アーティスト名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名（ふりがな）</label>
-                  <input
-                    type="text"
-                    value={editingSong.artistFurigana}
-                    onChange={(e) => setEditingSong({...editingSong, artistFurigana: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="あーてぃすとめい"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
-                  <div className="flex space-x-2">
-                    <select
-                      value={editingSong.genre}
-                      onChange={(e) => setEditingSong({...editingSong, genre: e.target.value})}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                      <option value="">ジャンルを選択</option>
-                      {availableGenres.map(genre => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
-                    </select>
+              <div className="overflow-y-auto" style={{maxHeight: 'calc(100vh - 200px)'}}>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
                     <input
                       type="text"
-                      placeholder="新しいジャンル"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && e.target.value.trim()) {
-                          addGenre(e.target.value.trim());
-                          setEditingSong({...editingSong, genre: e.target.value.trim()});
-                          e.target.value = '';
-                        }
-                      }}
-                      className="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      value={editingSong.title}
+                      onChange={(e) => setEditingSong({...editingSong, title: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="楽曲名を入力"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名（ふりがな）</label>
+                    <input
+                      type="text"
+                      value={editingSong.titleFurigana}
+                      onChange={(e) => setEditingSong({...editingSong, titleFurigana: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="がくきょくめい"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
+                    <input
+                      type="text"
+                      value={editingSong.artist}
+                      onChange={(e) => setEditingSong({...editingSong, artist: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="アーティスト名を入力"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名（ふりがな）</label>
+                    <input
+                      type="text"
+                      value={editingSong.artistFurigana}
+                      onChange={(e) => setEditingSong({...editingSong, artistFurigana: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="あーてぃすとめい"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
+                    <div className="flex space-x-2">
+                      <select
+                        value={editingSong.genre}
+                        onChange={(e) => setEditingSong({...editingSong, genre: e.target.value})}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      >
+                        <option value="">ジャンルを選択</option>
+                        {availableGenres.map(genre => (
+                          <option key={genre} value={genre}>{genre}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="新しいジャンル"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && e.target.value.trim()) {
+                            addGenre(e.target.value.trim());
+                            setEditingSong({...editingSong, genre: e.target.value.trim()});
+                            e.target.value = '';
+                          }
+                        }}
+                        className="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">タグ（スペース区切り）</label>
+                    <input
+                      type="text"
+                      value={editingSong.tags.join(' ')}
+                      onChange={(e) => setEditingSong({...editingSong, tags: e.target.value.split(' ').filter(tag => tag.trim())})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="バラード ロック"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
+                    <input
+                      type="text"
+                      value={editingSong.youtubeUrl}
+                      onChange={(e) => setEditingSong({...editingSong, youtubeUrl: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                    <textarea
+                      value={editingSong.memo}
+                      onChange={(e) => setEditingSong({...editingSong, memo: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="メモがあれば入力"
+                      rows="2"
                     />
                   </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ（スペース区切り）</label>
-                  <input
-                    type="text"
-                    value={editingSong.tags.join(' ')}
-                    onChange={(e) => setEditingSong({...editingSong, tags: e.target.value.split(' ').filter(tag => tag.trim())})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="バラード ロック"
-                  />
+              </div>
+              
+              <div className="flex space-x-2 mt-4 pt-4 border-t border-gray-200 bg-white/95">
+                <button
+                  onClick={saveEditedSong}
+                  disabled={!editingSong.title || !editingSong.artist}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded text-sm font-medium"
+                >
+                  保存
+                </button>
+                <button
+                  onClick={closeEditModal}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md my-8 max-h-none"
+                 style={{maxHeight: 'calc(100vh - 64px)'}}>
+              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲追加</h3>
+              
+              <div className="overflow-y-auto" style={{maxHeight: 'calc(100vh - 200px)'}}>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
+                    <input
+                      type="text"
+                      value={newSong.title}
+                      onChange={(e) => setNewSong({...newSong, title: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="楽曲名を入力"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名（ふりがな）</label>
+                    <input
+                      type="text"
+                      value={newSong.titleFurigana}
+                      onChange={(e) => setNewSong({...newSong, titleFurigana: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="がくきょくめい"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
+                    <input
+                      type="text"
+                      value={newSong.artist}
+                      onChange={(e) => setNewSong({...newSong, artist: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="アーティスト名を入力"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名（ふりがな）</label>
+                    <input
+                      type="text"
+                      value={newSong.artistFurigana}
+                      onChange={(e) => setNewSong({...newSong, artistFurigana: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="あーてぃすとめい"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
+                    <div className="flex space-x-2">
+                      <select
+                        value={newSong.genre}
+                        onChange={(e) => setNewSong({...newSong, genre: e.target.value})}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      >
+                        <option value="">ジャンルを選択</option>
+                        {availableGenres.map(genre => (
+                          <option key={genre} value={genre}>{genre}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="新しいジャンル"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && e.target.value.trim()) {
+                            addGenre(e.target.value.trim());
+                            setNewSong({...newSong, genre: e.target.value.trim()});
+                            e.target.value = '';
+                          }
+                        }}
+                        className="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">タグ（スペース区切り）</label>
+                    <input
+                      type="text"
+                      value={newSong.tags.join(' ')}
+                      onChange={(e) => setNewSong({...newSong, tags: e.target.value.split(' ').filter(tag => tag.trim())})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="バラード ロック"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
+                    <input
+                      type="text"
+                      value={newSong.youtubeUrl}
+                      onChange={(e) => setNewSong({...newSong, youtubeUrl: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                    <textarea
+                      value={newSong.memo}
+                      onChange={(e) => setNewSong({...newSong, memo: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="メモがあれば入力"
+                      rows="2"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4 pt-4 border-t border-gray-200 bg-white/95">
+                <button
+                  onClick={addSong}
+                  disabled={!newSong.title || !newSong.artist}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded text-sm font-medium"
+                >
+                  追加
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showBulkAddModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-2xl my-8 max-h-none"
+                 style={{maxHeight: 'calc(100vh - 64px)'}}>
+              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲一括追加</h3>
+              
+              <div className="overflow-y-auto" style={{maxHeight: 'calc(100vh - 250px)'}}>
+                <div className="mb-4 p-3 bg-blue-50 rounded text-sm text-gray-700">
+                  <p className="font-medium mb-2">入力形式：</p>
+                  <p className="mb-1">1行に1曲、楽曲名のみ、または「楽曲名, アーティスト名」で入力してください。</p>
+                  <p className="text-xs text-gray-600 mt-2">
+                    ※アーティスト名を省略した場合は「不明」として登録されます。詳細は編集ボタンで後から設定できます。
+                  </p>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
-                  <input
-                    type="text"
-                    value={editingSong.youtubeUrl}
-                    onChange={(e) => setEditingSong({...editingSong, youtubeUrl: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">楽曲データ</label>
+                  <textarea
+                    value={bulkAddText}
+                    onChange={(e) => setBulkAddText(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                    placeholder="例：夜に駆ける, YOASOBI&#10;香水, 瑛人&#10;残酷な天使のテーゼ, 高橋洋子"
+                    rows="8"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 pt-4 border-t border-gray-200 bg-white/95">
+                <button
+                  onClick={addBulkSongs}
+                  disabled={!bulkAddText.trim()}
+                  className="flex-1 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded text-sm font-medium"
+                >
+                  一括追加
+                </button>
+                <button
+                  onClick={() => setShowBulkAddModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
