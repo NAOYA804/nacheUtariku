@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Youtube, FileText, Sun, Moon } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, get, onValue } from 'firebase/database';
+
+// Firebaseインスタンスを保持する変数
+let firebaseAppInstance = null;
+let firebaseDatabaseInstance = null;
 
 export default function SimpleRequestApp() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -57,20 +63,20 @@ export default function SimpleRequestApp() {
         return null;
       }
 
-      // 実際のFirebase設定（本番環境では環境変数から取得推奨）
+      // 実際のFirebase設定
       const config = {
-        apiKey: "your-actual-api-key", // 実際のAPIキーに置き換え
-        authDomain: "your-project.firebaseapp.com", // 実際のドメインに置き換え
-        projectId: "your-project-id", // 実際のプロジェクトIDに置き換え
-        storageBucket: "your-project.appspot.com", // 実際のストレージバケットに置き換え
-        messagingSenderId: "123456789", // 実際のSender IDに置き換え
-        appId: "1:123456789:web:abcdefghijklmnop", // 実際のApp IDに置き換え
-        databaseURL: "https://your-project-id-default-rtdb.firebaseio.com/" // Realtime Database URL
+        apiKey: "YOUR_ACTUAL_API_KEY_HERE", // 👈 Firebase Consoleからコピー
+        authDomain: "song-request-app-a590c.firebaseapp.com", // 👈 あなたのプロジェクトIDに合わせる
+        projectId: "song-request-app-a590c", // 👈 あなたのプロジェクトID
+        storageBucket: "song-request-app-a590c.appspot.com", // 👈 あなたのプロジェクトIDに合わせる
+        messagingSenderId: "YOUR_ACTUAL_MESSAGING_SENDER_ID_HERE", // 👈 Firebase Consoleからコピー
+        appId: "YOUR_ACTUAL_APP_ID_HERE", // 👈 Firebase Consoleからコピー
+        databaseURL: "https://song-request-app-a590c-default-rtdb.asia-southeast1.firebasedatabase.app" // 👈 あなたのDBのURL
       };
 
       // 設定値の存在確認
-      if (!config.apiKey || config.apiKey.includes('your-')) {
-        console.warn('Firebase config contains placeholder values');
+      if (!config.apiKey || config.apiKey.includes('YOUR_ACTUAL_API_KEY_HERE')) {
+        console.warn('Firebase config contains placeholder values - Please update them!');
         return null;
       }
 
@@ -92,16 +98,16 @@ export default function SimpleRequestApp() {
           return false;
         }
 
-        // 実際の環境では以下のコードを使用:
-        // import { initializeApp } from 'firebase/app';
-        // import { getDatabase } from 'firebase/database';
-        // const app = initializeApp(config);
-        // const database = getDatabase(app);
-        // console.log('Firebase初期化完了');
+        // --- ここから実際のFirebase初期化コード ---
+        if (!firebaseAppInstance) { // アプリがまだ初期化されていなければ
+          firebaseAppInstance = initializeApp(config);
+        }
+        if (!firebaseDatabaseInstance) { // データベースがまだ取得されていなければ
+          firebaseDatabaseInstance = getDatabase(firebaseAppInstance);
+        }
+        console.log('Firebase初期化完了');
+        // --- ここまで ---
         
-        // デモ環境では接続成功をシミュレート
-        await new Promise(resolve => setTimeout(resolve, 100));
-        console.log('Firebase初期化完了（デモモード）');
         return true;
       } catch (error) {
         console.error('Firebase初期化エラー:', error);
@@ -112,15 +118,14 @@ export default function SimpleRequestApp() {
     // データ保存
     saveData: async (type, data) => {
       try {
-        // 実際の環境では以下のコードを使用:
-        // import { ref, set } from 'firebase/database';
-        // const database = getDatabase();
-        // await set(ref(database, type), data);
-        // console.log(`${type}をFirebaseに保存しました`);
-        
-        // デモ環境では保存成功をシミュレート
-        await new Promise(resolve => setTimeout(resolve, 50));
-        console.log(`${type}をFirebaseに保存しました（デモモード）`);
+        if (!firebaseDatabaseInstance) { // DBインスタンスがない場合はエラー
+          console.warn('Firebase Database is not initialized. Cannot save data.');
+          throw new Error('Firebase Database not initialized.');
+        }
+        // --- ここから実際のデータ保存コード ---
+        await set(ref(firebaseDatabaseInstance, type), data);
+        console.log(`${type}をFirebaseに保存しました`);
+        // --- ここまで ---
         return true;
       } catch (error) {
         console.error(`Firebase保存エラー (${type}):`, error);
@@ -131,18 +136,17 @@ export default function SimpleRequestApp() {
     // データ読み込み
     loadData: async (type) => {
       try {
-        // 実際の環境では以下のコードを使用:
-        // import { ref, get } from 'firebase/database';
-        // const database = getDatabase();
-        // const snapshot = await get(ref(database, type));
-        // if (snapshot.exists()) {
-        //   return snapshot.val();
-        // }
-        // return null;
-        
-        // デモ環境では null を返す（ローカルデータを優先）
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return null;
+        if (!firebaseDatabaseInstance) { // DBインスタンスがない場合はエラー
+          console.warn('Firebase Database is not initialized. Cannot load data.');
+          return null;
+        }
+        // --- ここから実際のデータ読み込みコード ---
+        const snapshot = await get(ref(firebaseDatabaseInstance, type));
+        if (snapshot.exists()) {
+          return snapshot.val();
+        }
+        // --- ここまで ---
+        return null; // データが存在しない場合
       } catch (error) {
         console.error(`Firebase読み込みエラー (${type}):`, error);
         throw error;
@@ -152,47 +156,42 @@ export default function SimpleRequestApp() {
     // リアルタイムリスナー設定
     setupRealtimeListener: (callback) => {
       try {
-        // 実際の環境では以下のコードを使用:
-        // import { ref, onValue } from 'firebase/database';
-        // const database = getDatabase();
-        // const songsRef = ref(database, 'songs');
-        // const publishedSongsRef = ref(database, 'publishedSongs');
-        // const adminMessageRef = ref(database, 'adminMessage');
-        // 
-        // const unsubscribeSongs = onValue(songsRef, (snapshot) => {
-        //   if (snapshot.exists()) {
-        //     callback('songs', snapshot.val());
-        //   }
-        // });
-        // 
-        // const unsubscribePublished = onValue(publishedSongsRef, (snapshot) => {
-        //   if (snapshot.exists()) {
-        //     callback('publishedSongs', snapshot.val());
-        //   }
-        // });
-        // 
-        // const unsubscribeMessage = onValue(adminMessageRef, (snapshot) => {
-        //   if (snapshot.exists()) {
-        //     callback('adminMessage', snapshot.val());
-        //   }
-        // });
-        // 
-        // return () => {
-        //   unsubscribeSongs();
-        //   unsubscribePublished();
-        //   unsubscribeMessage();
-        // };
-
-        // デモ環境では他のクライアントからの変更をシミュレート
-        const interval = setInterval(() => {
-          const shouldSync = Math.random() > 0.99; // 1%の確率で他のクライアントの変更をシミュレート
-          if (shouldSync) {
-            console.log('リアルタイム同期: 他のクライアントからの更新を検知（デモモード）');
-            // 実際の実装では、ここでcallbackを呼び出してデータを更新
+        if (!firebaseDatabaseInstance) { // DBインスタンスがない場合はエラー
+          console.warn('Firebase Database is not initialized. Cannot set up listener.');
+          return null;
+        }
+        // --- ここから実際のリアルタイムリスナーコード ---
+        const songsRef = ref(firebaseDatabaseInstance, 'songs');
+        const publishedSongsRef = ref(firebaseDatabaseInstance, 'publishedSongs');
+        const adminMessageRef = ref(firebaseDatabaseInstance, 'adminMessage');
+        
+        // 各データパスに対してonValueリスナーを設定
+        const unsubscribeSongs = onValue(songsRef, (snapshot) => {
+          if (snapshot.exists()) {
+            callback('songs', snapshot.val());
           }
-        }, 10000);
-
-        return () => clearInterval(interval);
+        }, (error) => console.error("Songs listener error:", error));
+        
+        const unsubscribePublished = onValue(publishedSongsRef, (snapshot) => {
+          if (snapshot.exists()) {
+            callback('publishedSongs', snapshot.val());
+          }
+        }, (error) => console.error("Published Songs listener error:", error));
+        
+        const unsubscribeMessage = onValue(adminMessageRef, (snapshot) => {
+          if (snapshot.exists()) {
+            callback('adminMessage', snapshot.val());
+          }
+        }, (error) => console.error("Admin Message listener error:", error));
+        
+        // すべてのリスナーを解除するための関数を返す
+        return () => {
+          unsubscribeSongs();
+          unsubscribePublished();
+          unsubscribeMessage();
+          console.log('リアルタイムリスナーをすべて解除しました');
+        };
+        // --- ここまで ---
       } catch (error) {
         console.error('リアルタイムリスナー設定エラー:', error);
         return null;
@@ -203,7 +202,7 @@ export default function SimpleRequestApp() {
     removeRealtimeListener: (unsubscribe) => {
       try {
         if (unsubscribe) {
-          unsubscribe();
+          unsubscribe(); // setupRealtimeListenerが返した解除関数を呼び出す
           console.log('リアルタイムリスナーを解除しました');
         }
       } catch (error) {
