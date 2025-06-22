@@ -103,16 +103,14 @@ export default function SimpleRequestApp() {
     // データ読み込み
     loadData: async () => {
       try {
-        // Firebase Realtime Databaseからデータを取得（モック）
+        // Firebase Realtime Databaseからデータを取得
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        const mockFirebaseData = {
-          songs: initialSongs,
-          publishedSongs: initialSongs,
-          adminMessage: '配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪'
-        };
-
-        return mockFirebaseData;
+        // 実際の実装では、Firebaseからデータを取得して、
+        // ローカルデータとマージまたは最新データで上書き
+        // ここではlocalStorageのデータを優先してFirebaseを補完として使用
+        
+        return null; // ローカルデータを優先するためnullを返す
       } catch (error) {
         console.error('Firebase load error:', error);
         throw error;
@@ -143,15 +141,16 @@ export default function SimpleRequestApp() {
         // });
         // return unsubscribe;
 
-        // モック実装：5秒ごとにリアルタイム更新をシミュレート
+        // モック実装：実際のFirebaseでは他のクライアントからの変更のみ受信
         const interval = setInterval(() => {
-          // 他のクライアントからの変更をシミュレート（実際にはFirebaseからのデータ）
-          const randomUpdate = Math.random();
-          if (randomUpdate > 0.95) { // 5%の確率で同期イベント
-            console.log('リアルタイム同期: 他のクライアントからの更新を検出');
+          // 実際の実装では、自分以外のクライアントからの変更のみ処理
+          const shouldSync = Math.random() > 0.98; // 2%の確率で他のクライアントの変更をシミュレート
+          if (shouldSync) {
+            console.log('リアルタイム同期: 他のクライアントからの更新を受信');
             // 実際の実装では、Firebaseから受信したデータでstateを更新
+            // ここでは何もしない（ローカルデータを保持）
           }
-        }, 5000);
+        }, 10000);
 
         return () => clearInterval(interval);
       } catch (error) {
@@ -201,48 +200,49 @@ export default function SimpleRequestApp() {
     }
   };
 
-  // データ読み込み（Firebase優先、フォールバックでlocalStorage）+ リアルタイム同期開始
+  // データ読み込み（localStorage優先、Firebase補完）+ リアルタイム同期開始
   const loadData = async () => {
     try {
-      // Firebase接続を試行（サイレント）
+      // まずlocalStorageからデータを読み込み（ページ更新時のデータ保持）
+      const localData = loadFromLocalStorage();
+      setSongs(localData.songs);
+      setPublishedSongs(localData.publishedSongs);
+      setAdminMessage(localData.adminMessage);
+
+      // Firebase接続を試行（バックグラウンド）
       const connected = await firebaseAPI.initialize();
       
       if (connected) {
-        // Firebaseからデータを読み込み
-        const firebaseData = await firebaseAPI.loadData();
-        setSongs(firebaseData.songs);
-        setPublishedSongs(firebaseData.publishedSongs);
-        setAdminMessage(firebaseData.adminMessage);
-
-        // リアルタイム同期リスナーを設定
+        // リアルタイム同期リスナーを設定（他のクライアントからの変更のみ受信）
         const unsubscribe = firebaseAPI.setupRealtimeListener((type, data) => {
-          // 他のクライアントからの変更を受信した時の処理
+          // 他のクライアントからの変更を受信した時のみ処理
+          console.log(`リアルタイム同期: ${type}が他のクライアントで更新されました`);
           switch (type) {
             case 'songs':
               setSongs(data);
+              safeLocalStorage.setItem('songs', data);
               break;
             case 'publishedSongs':
               setPublishedSongs(data);
+              safeLocalStorage.setItem('publishedSongs', data);
               break;
             case 'adminMessage':
               setAdminMessage(data);
+              safeLocalStorage.setItem('adminMessage', data);
               break;
           }
         });
         setRealtimeListener(unsubscribe);
-      } else {
-        // localStorageからデータを読み込み
-        const localData = loadFromLocalStorage();
-        setSongs(localData.songs);
-        setPublishedSongs(localData.publishedSongs);
-        setAdminMessage(localData.adminMessage);
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      // エラー時は初期データを使用
-      setSongs(initialSongs);
-      setPublishedSongs(initialSongs);
-      setAdminMessage('配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪');
+      // エラー時は既存のlocalStorageデータを保持、なければ初期データ
+      const localData = loadFromLocalStorage();
+      if (localData.songs.length === 0) {
+        setSongs(initialSongs);
+        setPublishedSongs(initialSongs);
+        setAdminMessage('配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪');
+      }
     }
   };
 
