@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff } from 'lucide-react';
 
 export default function SimpleRequestApp() {
+  // 基本状態
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState('');
@@ -13,14 +14,16 @@ export default function SimpleRequestApp() {
   const [showPublishMessage, setShowPublishMessage] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
 
+  // 楽曲データ
   const [songs, setSongs] = useState([
-    { id: 1, title: '10月無口な君を忘れる', artist: 'あたらよ', genre: 'J-POP', tags: ['バラード'], memo: '', copyCount: 2 },
-    { id: 2, title: '366日', artist: 'HY', genre: 'J-POP', tags: ['沖縄'], memo: '', copyCount: 5 },
-    { id: 3, title: '3月9日', artist: 'レミオロメン', genre: 'J-POP', tags: ['卒業'], memo: '', copyCount: 8 },
-    { id: 4, title: '夜に駆ける', artist: 'YOASOBI', genre: 'J-POP', tags: ['ボカロ系'], memo: '人気曲', copyCount: 15 },
-    { id: 5, title: '紅蓮華', artist: 'LiSA', genre: 'アニソン', tags: ['アニソン'], memo: '鬼滅の刃主題歌', copyCount: 12 }
+    { id: 1, title: '10月無口な君を忘れる', artist: 'あたらよ', genre: 'J-POP', copyCount: 2 },
+    { id: 2, title: '366日', artist: 'HY', genre: 'J-POP', copyCount: 5 },
+    { id: 3, title: '3月9日', artist: 'レミオロメン', genre: 'J-POP', copyCount: 8 },
+    { id: 4, title: '夜に駆ける', artist: 'YOASOBI', genre: 'J-POP', copyCount: 15 },
+    { id: 5, title: '紅蓮華', artist: 'LiSA', genre: 'アニソン', copyCount: 12 }
   ]);
 
+  // UI状態
   const [adminMessage, setAdminMessage] = useState('配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪');
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedSong, setCopiedSong] = useState(null);
@@ -34,14 +37,13 @@ export default function SimpleRequestApp() {
   const [newSong, setNewSong] = useState({
     title: '',
     artist: '',
-    genre: '',
-    tags: [],
-    memo: ''
+    genre: ''
   });
   
   const [publishedSongs, setPublishedSongs] = useState([]);
   const [availableGenres] = useState(['J-POP', 'アニソン', 'ロック', 'バラード', '演歌', 'クラシック']);
 
+  // テーマ
   const currentTheme = isDarkMode ? {
     background: 'bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900',
     card: 'bg-white/10 backdrop-blur-md border-white/20',
@@ -68,6 +70,7 @@ export default function SimpleRequestApp() {
     inputFocus: 'focus:ring-purple-500'
   };
 
+  // 初期化
   useEffect(() => {
     const init = async () => {
       setLoadingFirebase(true);
@@ -81,6 +84,7 @@ export default function SimpleRequestApp() {
     init();
   }, []);
 
+  // 計算プロパティ
   const displayedSongs = isAdmin ? songs : publishedSongs;
   const topSongs = displayedSongs.filter(song => song.copyCount > 0).sort((a, b) => b.copyCount - a.copyCount).slice(0, 3);
   
@@ -88,11 +92,11 @@ export default function SimpleRequestApp() {
     const matchesSearch = searchTerm === '' || 
            song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
            song.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           song.genre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           (song.memo && song.memo.toLowerCase().includes(searchTerm.toLowerCase()));
+           song.genre.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
+  // イベントハンドラー
   const copyToClipboard = async (song) => {
     const requestText = `♪ ${song.title} - ${song.artist}`;
     try {
@@ -141,10 +145,10 @@ export default function SimpleRequestApp() {
     if (!newSong.title || !newSong.artist) return;
     
     const id = Math.max(...songs.map(s => s.id), 0) + 1;
-    const songToAdd = { ...newSong, id, copyCount: 0, tags: newSong.tags || [] };
+    const songToAdd = { ...newSong, id, copyCount: 0 };
     setSongs([...songs, songToAdd]);
     
-    setNewSong({ title: '', artist: '', genre: '', tags: [], memo: '' });
+    setNewSong({ title: '', artist: '', genre: '' });
     setShowAddModal(false);
   };
 
@@ -170,28 +174,7 @@ export default function SimpleRequestApp() {
     <div className={`min-h-screen ${currentTheme.background}`}>
       <div className="container mx-auto px-3 py-3 max-w-7xl">
         
-        <div className="mb-3 space-y-2">
-          <div className={`p-3 rounded text-sm flex items-center ${firebaseConnected ? 'bg-green-500/20 border border-green-500/30 text-green-300' : 'bg-red-500/20 border border-red-500/30 text-red-300'}`}>
-            <div className="flex items-center space-x-2">
-              {firebaseConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-              <span>{firebaseConnected ? '🔥 Firebase接続成功' : '⚠️ Firebase未接続'}</span>
-            </div>
-          </div>
-          
-          <div className={`p-3 rounded text-sm flex items-center ${databaseConnected ? 'bg-blue-500/20 border border-blue-500/30 text-blue-300' : 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-300'}`}>
-            <div className="flex items-center space-x-2">
-              <Database className="w-4 h-4" />
-              <span>{databaseConnected ? '📊 データベース接続成功' : '📊 データベース未設定'}</span>
-            </div>
-          </div>
-          
-          {lastSyncTime && (
-            <div className={`text-xs ${currentTheme.textTertiary} text-center`}>
-              最終同期: {lastSyncTime.toLocaleString()}
-            </div>
-          )}
-        </div>
-
+        {/* ヘッダー */}
         <div className={`${currentTheme.card} rounded-lg p-3 mb-3 border`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -220,6 +203,7 @@ export default function SimpleRequestApp() {
           </div>
         </div>
 
+        {/* メッセージ */}
         <div className={`${currentTheme.card} rounded-lg p-3 mb-3 border`}>
           <div className="flex items-start space-x-2">
             <MessageSquare className={`w-4 h-4 ${currentTheme.icon} mt-0.5`} />
@@ -241,6 +225,7 @@ export default function SimpleRequestApp() {
           </div>
         </div>
 
+        {/* ゲスト案内 */}
         {!isAdmin && (
           <div className={`${isDarkMode ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-md border-purple-300/30' : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-200'} rounded-lg p-3 mb-3 border`}>
             <div className="flex items-center space-x-2 mb-2">
@@ -265,6 +250,7 @@ export default function SimpleRequestApp() {
           </div>
         )}
 
+        {/* 管理者コントロール */}
         {isAdmin && (
           <div className={`${currentTheme.card} rounded-lg p-3 mb-3 border`}>
             <div className="flex items-center justify-between">
@@ -292,6 +278,7 @@ export default function SimpleRequestApp() {
           </div>
         )}
 
+        {/* 検索 */}
         <div className={`${currentTheme.card} rounded-lg p-3 mb-3 border`}>
           <div className="relative">
             <Search className={`absolute left-2 top-2 w-4 h-4 ${isDarkMode ? 'text-white/50' : 'text-gray-400'}`} />
@@ -305,6 +292,7 @@ export default function SimpleRequestApp() {
           </div>
         </div>
 
+        {/* 楽曲一覧 */}
         <div className={`${currentTheme.card} rounded-lg border overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -393,6 +381,9 @@ export default function SimpleRequestApp() {
           )}
         </div>
 
+        {/* モーダル群 */}
+        
+        {/* パスワードモーダル */}
         {showPasswordModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-sm">
@@ -432,9 +423,136 @@ export default function SimpleRequestApp() {
           </div>
         )}
 
+        {/* 削除確認モーダル */}
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-sm">
+              <h3 className="text-lg font-bold text-gray-800 mb-3">削除確認</h3>
+              <p className="text-gray-700 mb-2">以下の楽曲を削除しますか？</p>
+              <div className="bg-gray-100 rounded p-2 mb-4">
+                <p className="font-medium text-gray-800">{deleteConfirm.title}</p>
+                <p className="text-gray-600 text-sm">{deleteConfirm.artist}</p>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => deleteSong(deleteConfirm)}
+                  className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium"
+                >
+                  削除する
+                </button>
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 楽曲追加モーダル */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲追加</h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
+                  <input
+                    type="text"
+                    value={newSong.title}
+                    onChange={(e) => setNewSong({...newSong, title: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="楽曲名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
+                  <input
+                    type="text"
+                    value={newSong.artist}
+                    onChange={(e) => setNewSong({...newSong, artist: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="アーティスト名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
+                  <select
+                    value={newSong.genre}
+                    onChange={(e) => setNewSong({...newSong, genre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">ジャンルを選択</option>
+                    {availableGenres.map(genre => (
+                      <option key={genre} value={genre}>{genre}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={addSong}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                  disabled={!newSong.title || !newSong.artist}
+                >
+                  追加
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* メッセージ編集モーダル */}
+        {showMessageEditModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">メッセージ編集</h3>
+              
+              <textarea
+                value={tempAdminMessage}
+                onChange={(e) => setTempAdminMessage(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder="配信者からのメッセージを入力"
+                rows="4"
+              />
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={() => {
+                    setAdminMessage(tempAdminMessage);
+                    setShowMessageEditModal(false);
+                  }}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                >
+                  保存
+                </button>
+                <button
+                  onClick={() => setShowMessageEditModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 楽曲編集モーダル */}
+        {showEditModal && editingSong && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
               <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲編集</h3>
               
               <div className="space-y-3">
@@ -504,127 +622,4 @@ export default function SimpleRequestApp() {
       </div>
     </div>
   );
-}text-lg font-bold text-gray-800 mb-3">削除確認</h3>
-              <p className="text-gray-700 mb-2">以下の楽曲を削除しますか？</p>
-              <div className="bg-gray-100 rounded p-2 mb-4">
-                <p className="font-medium text-gray-800">{deleteConfirm.title}</p>
-                <p className="text-gray-600 text-sm">{deleteConfirm.artist}</p>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => deleteSong(deleteConfirm)}
-                  className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium"
-                >
-                  削除する
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲追加</h3>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
-                  <input
-                    type="text"
-                    value={newSong.title}
-                    onChange={(e) => setNewSong({...newSong, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="楽曲名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
-                  <input
-                    type="text"
-                    value={newSong.artist}
-                    onChange={(e) => setNewSong({...newSong, artist: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="アーティスト名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
-                  <select
-                    value={newSong.genre}
-                    onChange={(e) => setNewSong({...newSong, genre: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  >
-                    <option value="">ジャンルを選択</option>
-                    {availableGenres.map(genre => (
-                      <option key={genre} value={genre}>{genre}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={addSong}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                  disabled={!newSong.title || !newSong.artist}
-                >
-                  追加
-                </button>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showMessageEditModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">メッセージ編集</h3>
-              
-              <textarea
-                value={tempAdminMessage}
-                onChange={(e) => setTempAdminMessage(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="配信者からのメッセージを入力"
-                rows="4"
-              />
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={() => {
-                    setAdminMessage(tempAdminMessage);
-                    setShowMessageEditModal(false);
-                  }}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                >
-                  保存
-                </button>
-                <button
-                  onClick={() => setShowMessageEditModal(false)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showEditModal && editingSong && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
-              <h3 className="
+}
