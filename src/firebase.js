@@ -1,4 +1,3 @@
-// src/firebase.js
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 
@@ -10,8 +9,9 @@ const firebaseConfig = {
   storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.REACT_APP_FIREBASE_APP_ID,
-  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);
-export const database = getDatabase(app);
+
+export const db = getDatabase(app);
