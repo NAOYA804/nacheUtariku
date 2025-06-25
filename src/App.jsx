@@ -185,7 +185,15 @@ export default function SimpleRequestApp() {
       setLoadingFirebase(true);
       
       try {
-        // Firebaseからデータを読み込み
+        // 実際の環境では以下のFirestore読み込みコードを使用
+        /*
+        const snap = await getDocs(collection(db, "songs"));
+        const loadedSongs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setSongs(loadedSongs);
+        setPublishedSongs(loadedSongs);
+        */
+        
+        // モック実装: 初期データを設定
         const [loadedSongs, loadedPublished, loadedMessage, loadedDarkMode] = await Promise.all([
           loadFromFirebase('songs', initialSongs),
           loadFromFirebase('publishedSongs', initialSongs),
@@ -277,13 +285,35 @@ export default function SimpleRequestApp() {
   const addSong = async () => {
     if (!newSong.title || !newSong.artist) return;
     
-    const id = Math.max(...songs.map(s => s.id), 0) + 1;
-    const songToAdd = { ...newSong, id, copyCount: 0, tags: newSong.tags || [] };
-    const updatedSongs = [...songs, songToAdd];
-    await saveSongsToFirebase(updatedSongs);
-    
-    setNewSong({ title: '', artist: '', genre: '', tags: [], memo: '' });
-    setShowAddModal(false);
+    try {
+      // 実際の環境では以下のFirestore追加コードを使用
+      /*
+      const docRef = await addDoc(collection(db, "songs"), {
+        title: newSong.title,
+        artist: newSong.artist,
+        genre: newSong.genre,
+        tags: newSong.tags,
+        memo: newSong.memo,
+        copyCount: 0
+      });
+      setSongs([
+        ...songs,
+        { id: docRef.id, ...newSong, copyCount: 0 }
+      ]);
+      */
+      
+      // モック実装: ローカル追加とFirebase保存
+      const id = Math.max(...songs.map(s => s.id), 0) + 1;
+      const songToAdd = { ...newSong, id, copyCount: 0, tags: newSong.tags || [] };
+      const updatedSongs = [...songs, songToAdd];
+      await saveSongsToFirebase(updatedSongs);
+      
+      setNewSong({ title: '', artist: '', genre: '', tags: [], memo: '' });
+      setShowAddModal(false);
+      console.log('Song added successfully');
+    } catch (error) {
+      console.error('追加エラー:', error);
+    }
   };
 
   const publishSongs = async () => {
