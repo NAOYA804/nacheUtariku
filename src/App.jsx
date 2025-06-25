@@ -1,26 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff } from 'lucide-react';
 
-// Firebase Firestore のインポート（実際の運用時に使用）
-// import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
-// import { db } from "./firebase";
-
 export default function SimpleRequestApp() {
+  // 状態管理（重複なし）
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
   const [databaseConnected, setDatabaseConnected] = useState(false);
   const [loadingFirebase, setLoadingFirebase] = useState(true);
   const [showPublishMessage, setShowPublishMessage] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
-
-  // Firebase設定（実際の運用時に設定）
-  const firebaseConfig = {
-    databaseURL: "https://song-request-app-default-rtdb.firebaseio.com/",
-    // 他の設定は実際のFirebaseプロジェクトに合わせて設定
-  };
 
   // データの初期値
   const initialSongs = [
@@ -34,179 +26,8 @@ export default function SimpleRequestApp() {
   // Firebase操作関数（モック実装）
   const saveToFirebase = async (path, data) => {
     try {
-      console.log(`Saving to Firebase: ${path}`, data);
-      // モック実装: データを一時的に保存
       if (!window.firebaseData) {
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲追加</h3>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
-                  <input
-                    type="text"
-                    value={newSong.title}
-                    onChange={(e) => setNewSong({...newSong, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="楽曲名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
-                  <input
-                    type="text"
-                    value={newSong.artist}
-                    onChange={(e) => setNewSong({...newSong, artist: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="アーティスト名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
-                  <select
-                    value={newSong.genre}
-                    onChange={(e) => setNewSong({...newSong, genre: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  >
-                    <option value="">ジャンルを選択</option>
-                    {availableGenres.map(genre => (
-                      <option key={genre} value={genre}>{genre}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={addSong}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                  disabled={!newSong.title || !newSong.artist}
-                >
-                  追加
-                </button>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showMessageEditModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">メッセージ編集</h3>
-              
-              <textarea
-                value={tempAdminMessage}
-                onChange={(e) => setTempAdminMessage(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="配信者からのメッセージを入力"
-                rows="4"
-              />
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={() => {
-                    saveAdminMessageToFirebase(tempAdminMessage);
-                    setShowMessageEditModal(false);
-                  }}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                >
-                  保存
-                </button>
-                <button
-                  onClick={() => setShowMessageEditModal(false)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showEditModal && editingSong && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲編集</h3>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
-                  <input
-                    type="text"
-                    value={editingSong.title}
-                    onChange={(e) => setEditingSong({...editingSong, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="楽曲名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
-                  <input
-                    type="text"
-                    value={editingSong.artist}
-                    onChange={(e) => setEditingSong({...editingSong, artist: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="アーティスト名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
-                  <select
-                    value={editingSong.genre}
-                    onChange={(e) => setEditingSong({...editingSong, genre: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  >
-                    <option value="">ジャンルを選択</option>
-                    {availableGenres.map(genre => (
-                      <option key={genre} value={genre}>{genre}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={async () => {
-                    if (!editingSong.title || !editingSong.artist) return;
-                    const updatedSongs = songs.map(song => song.id === editingSong.id ? {...song, ...editingSong} : song);
-                    await saveSongsToFirebase(updatedSongs);
-                    setShowEditModal(false);
-                    setEditingSong(null);
-                  }}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                  disabled={!editingSong.title || !editingSong.artist}
-                >
-                  保存
-                </button>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingSong(null);
-                  }}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}window.firebaseData = {};
+        window.firebaseData = {};
       }
       window.firebaseData[path] = data;
       return { success: true };
@@ -218,8 +39,6 @@ export default function SimpleRequestApp() {
 
   const loadFromFirebase = async (path, defaultValue) => {
     try {
-      console.log(`Loading from Firebase: ${path}`);
-      // モック実装: 保存されたデータを読み込み
       if (window.firebaseData && window.firebaseData[path]) {
         return window.firebaseData[path];
       }
@@ -230,11 +49,10 @@ export default function SimpleRequestApp() {
     }
   };
 
-  // 状態管理（重複なし、正しい構文）
+  // 楽曲データ状態
   const [songs, setSongs] = useState(initialSongs);
   const [publishedSongs, setPublishedSongs] = useState(initialSongs);
   const [adminMessage, setAdminMessage] = useState('配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪');
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedSong, setCopiedSong] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -300,21 +118,12 @@ export default function SimpleRequestApp() {
     setIsDarkMode(darkMode);
   };
 
-  // Firebaseからデータを読み込む初期化
+  // 初期化
   useEffect(() => {
     const init = async () => {
       setLoadingFirebase(true);
       
       try {
-        // 実際の環境では以下のFirestore読み込みコードを使用
-        /*
-        const snap = await getDocs(collection(db, "songs"));
-        const loadedSongs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setSongs(loadedSongs);
-        setPublishedSongs(loadedSongs);
-        */
-        
-        // モック実装: 初期データを設定
         const [loadedSongs, loadedPublished, loadedMessage, loadedDarkMode] = await Promise.all([
           loadFromFirebase('songs', initialSongs),
           loadFromFirebase('publishedSongs', initialSongs),
@@ -330,8 +139,6 @@ export default function SimpleRequestApp() {
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
-        
-        console.log('Firebase data loaded successfully');
       } catch (error) {
         console.error('Firebase initialization error:', error);
         setFirebaseConnected(false);
@@ -409,23 +216,6 @@ export default function SimpleRequestApp() {
     if (!newSong.title || !newSong.artist) return;
     
     try {
-      // 実際の環境では以下のFirestore追加コードを使用
-      /*
-      const docRef = await addDoc(collection(db, "songs"), {
-        title: newSong.title,
-        artist: newSong.artist,
-        genre: newSong.genre,
-        tags: newSong.tags,
-        memo: newSong.memo,
-        copyCount: 0
-      });
-      setSongs([
-        ...songs,
-        { id: docRef.id, ...newSong, copyCount: 0 }
-      ]);
-      */
-      
-      // モック実装: ローカル追加とFirebase保存
       const id = Math.max(...songs.map(s => s.id), 0) + 1;
       const songToAdd = { ...newSong, id, copyCount: 0, tags: newSong.tags || [] };
       const updatedSongs = [...songs, songToAdd];
@@ -433,7 +223,6 @@ export default function SimpleRequestApp() {
       
       setNewSong({ title: '', artist: '', genre: '', tags: [], memo: '' });
       setShowAddModal(false);
-      console.log('Song added successfully');
     } catch (error) {
       console.error('追加エラー:', error);
     }
@@ -751,3 +540,44 @@ export default function SimpleRequestApp() {
             </div>
           </div>
         )}
+
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲追加</h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
+                  <input
+                    type="text"
+                    value={newSong.title}
+                    onChange={(e) => setNewSong({...newSong, title: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="楽曲名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
+                  <input
+                    type="text"
+                    value={newSong.artist}
+                    onChange={(e) => setNewSong({...newSong, artist: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="アーティスト名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
+                  <select
+                    value={newSong.genre}
+                    onChange={(e) => setNewSong({...newSong, genre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">ジャンルを選択</option>
+                    {availableGenres.map(genre => (
+                      <option key={genre} value={genre}>{genre}</option>
+                    ))}
+                  </select>
