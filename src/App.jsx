@@ -235,7 +235,6 @@ export default function SimpleRequestApp() {
   const [publishedSongs, setPublishedSongs] = useState(initialSongs);
   const [adminMessage, setAdminMessage] = useState('配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪');
   const [isDarkMode, setIsDarkMode] = useState(true);
-  
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedSong, setCopiedSong] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -244,7 +243,6 @@ export default function SimpleRequestApp() {
   const [editingSong, setEditingSong] = useState(null);
   const [showMessageEditModal, setShowMessageEditModal] = useState(false);
   const [tempAdminMessage, setTempAdminMessage] = useState('');
-  
   const [newSong, setNewSong] = useState({
     title: '',
     artist: '',
@@ -252,7 +250,6 @@ export default function SimpleRequestApp() {
     tags: [],
     memo: ''
   });
-  
   const [availableGenres] = useState(['J-POP', 'アニソン', 'ロック', 'バラード', '演歌', 'クラシック']);
 
   // テーマ設定
@@ -754,4 +751,3 @@ export default function SimpleRequestApp() {
             </div>
           </div>
         )}
-        
