@@ -34,11 +34,11 @@ export default function SimpleRequestApp() {
 
   // データの初期値
   const initialSongs = [
-    { id: 1, title: '10月無口な君を忘れる', artist: 'あたらよ', genre: 'J-POP', tags: ['バラード'], memo: '', copyCount: 2 },
-    { id: 2, title: '366日', artist: 'HY', genre: 'J-POP', tags: ['沖縄'], memo: '', copyCount: 5 },
-    { id: 3, title: '3月9日', artist: 'レミオロメン', genre: 'J-POP', tags: ['卒業'], memo: '', copyCount: 8 },
-    { id: 4, title: '夜に駆ける', artist: 'YOASOBI', genre: 'J-POP', tags: ['ボカロ系'], memo: '人気曲', copyCount: 15 },
-    { id: 5, title: '紅蓮華', artist: 'LiSA', genre: 'アニソン', tags: ['アニソン'], memo: '鬼滅の刃主題歌', copyCount: 12 }
+    { id: 1, title: '10月無口な君を忘れる', artist: 'あたらよ', reading: 'じゅうがつむくちなきみをわすれる', genre: 'J-POP', tags: ['バラード'], memo: '', copyCount: 2 },
+    { id: 2, title: '366日', artist: 'HY', reading: 'さんびゃくろくじゅうろくにち', genre: 'J-POP', tags: ['沖縄'], memo: '', copyCount: 5 },
+    { id: 3, title: '3月9日', artist: 'レミオロメン', reading: 'さんがつここのか', genre: 'J-POP', tags: ['卒業'], memo: '', copyCount: 8 },
+    { id: 4, title: '夜に駆ける', artist: 'YOASOBI', reading: 'よるにかける', genre: 'J-POP', tags: ['ボカロ系'], memo: '人気曲', copyCount: 15 },
+    { id: 5, title: '紅蓮華', artist: 'LiSA', reading: 'ぐれんげ', genre: 'アニソン', tags: ['アニソン'], memo: '鬼滅の刃主題歌', copyCount: 12 }
   ];
 
   // Firebase Firestore操作関数（実際のFirebase実装）
@@ -318,6 +318,8 @@ export default function SimpleRequestApp() {
            song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
            song.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
            song.genre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           (song.reading && song.reading.toLowerCase().includes(searchTerm.toLowerCase())) ||
+           (song.tags && song.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))) ||
            (song.memo && song.memo.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesSearch;
   });
@@ -548,7 +550,7 @@ export default function SimpleRequestApp() {
             <Search className={`absolute left-2 top-2 w-4 h-4 ${isDarkMode ? 'text-white/50' : 'text-gray-400'}`} />
             <input
               type="text"
-              placeholder="楽曲名、アーティスト名で検索..."
+              placeholder="楽曲名、アーティスト名、読み仮名、タグで検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={`w-full pl-8 pr-3 py-2 ${currentTheme.inputBg} border rounded ${currentTheme.inputText} focus:outline-none focus:ring-2 ${currentTheme.inputFocus} text-sm`}
@@ -564,7 +566,7 @@ export default function SimpleRequestApp() {
                   {!isAdmin && <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>リクエスト</th>}
                   <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>楽曲名</th>
                   <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>アーティスト</th>
-                  <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>ジャンル</th>
+                  <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>ジャンル/タグ</th>
                   {isAdmin && <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>管理</th>}
                 </tr>
               </thead>
@@ -600,14 +602,24 @@ export default function SimpleRequestApp() {
                     )}
                     <td className="px-4 py-3">
                       <div className={`${currentTheme.text} font-medium`}>{song.title}</div>
+                      {song.reading && (
+                        <div className={`${currentTheme.textTertiary} text-xs mt-1`}>{song.reading}</div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className={`${currentTheme.textSecondary}`}>{song.artist}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 ${isDarkMode ? 'bg-purple-500/30 text-purple-200' : 'bg-purple-100 text-purple-800'} rounded text-xs`}>
-                        {song.genre}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        <span className={`px-2 py-1 ${isDarkMode ? 'bg-purple-500/30 text-purple-200' : 'bg-purple-100 text-purple-800'} rounded text-xs`}>
+                          {song.genre}
+                        </span>
+                        {song.tags && song.tags.map((tag, index) => (
+                          <span key={index} className={`px-2 py-1 ${isDarkMode ? 'bg-blue-500/30 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded text-xs`}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-3">
