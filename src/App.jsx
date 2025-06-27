@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff } from 'lucide-react';
 
-// Firebase Firestore のインポート（実際の運用時に使用）
-// import { initializeApp } from 'firebase/app';
-// import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
-
 // Firebase設定（実際のプロジェクト設定に置き換えてください）
 const firebaseConfig = {
-  // apiKey: "your-api-key",
-  // authDomain: "your-project.firebaseapp.com",
-  // projectId: "your-project-id",
-  // storageBucket: "your-project.appspot.com",
-  // messagingSenderId: "123456789",
-  // appId: "your-app-id"
+  apiKey: "your-api-key",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "your-app-id"
 };
 
-// Firebase初期化（実際の運用時に使用）
+// Firebase初期化（本番環境で有効化）
 // const app = initializeApp(firebaseConfig);
 // const db = getFirestore(app);
 
@@ -44,20 +40,19 @@ export default function SimpleRequestApp() {
   // Firebase Firestore操作関数（実際のFirebase実装）
   const saveToFirebase = async (path, data) => {
     try {
-      // 実際のFirestore実装（運用時に有効化）
-      /*
-      const docRef = doc(db, 'app-data', path);
-      await setDoc(docRef, { data: data, updatedAt: new Date() });
-      console.log(`Data saved to Firestore: ${path}`, data);
-      */
+      // 実際のFirestore実装（本番環境で有効化）
+      // const docRef = doc(db, 'app-data', path);
+      // await setDoc(docRef, { data: data, updatedAt: new Date() });
       
-      // 開発環境用のモック実装
+      // 開発環境用のローカルストレージ実装
+      localStorage.setItem(`firebase_${path}`, JSON.stringify(data));
+      
+      // ウィンドウオブジェクトにも保存（セッション間での保持）
       if (!window.firebaseData) {
         window.firebaseData = {};
       }
       window.firebaseData[path] = data;
       
-      // 実際のFirebase環境では以下のようなログが出力されます
       console.log(`[Firebase] Document written to ${path}:`, data);
       return { success: true };
     } catch (error) {
@@ -68,24 +63,27 @@ export default function SimpleRequestApp() {
 
   const loadFromFirebase = async (path, defaultValue) => {
     try {
-      // 実際のFirestore実装（運用時に有効化）
-      /*
-      const docRef = doc(db, 'app-data', path);
-      const docSnap = await getDoc(docRef);
+      // 実際のFirestore実装（本番環境で有効化）
+      // const docRef = doc(db, 'app-data', path);
+      // const docSnap = await getDoc(docRef);
+      // if (docSnap.exists()) {
+      //   const data = docSnap.data().data;
+      //   console.log(`Data loaded from Firestore: ${path}`, data);
+      //   return data;
+      // }
       
-      if (docSnap.exists()) {
-        const data = docSnap.data().data;
-        console.log(`Data loaded from Firestore: ${path}`, data);
-        return data;
-      } else {
-        console.log(`No document found for ${path}, using default`);
-        return defaultValue;
+      // 開発環境用の実装
+      // まずローカルストレージから読み込み
+      const savedData = localStorage.getItem(`firebase_${path}`);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        console.log(`[Firebase] Document read from localStorage: ${path}`, parsedData);
+        return parsedData;
       }
-      */
       
-      // 開発環境用のモック実装
+      // ローカルストレージにない場合、ウィンドウオブジェクトから読み込み
       if (window.firebaseData && window.firebaseData[path]) {
-        console.log(`[Firebase] Document read from ${path}:`, window.firebaseData[path]);
+        console.log(`[Firebase] Document read from memory: ${path}`, window.firebaseData[path]);
         return window.firebaseData[path];
       }
       
@@ -99,16 +97,14 @@ export default function SimpleRequestApp() {
 
   const addSongToFirestore = async (songData) => {
     try {
-      // 実際のFirestore実装（運用時に有効化）
-      /*
-      const docRef = await addDoc(collection(db, 'songs'), {
-        ...songData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      console.log('Song added to Firestore with ID: ', docRef.id);
-      return docRef.id;
-      */
+      // 実際のFirestore実装（本番環境で有効化）
+      // const docRef = await addDoc(collection(db, 'songs'), {
+      //   ...songData,
+      //   createdAt: new Date(),
+      //   updatedAt: new Date()
+      // });
+      // console.log('Song added to Firestore with ID: ', docRef.id);
+      // return docRef.id;
       
       // 開発環境用のモック実装
       const id = Date.now().toString();
@@ -122,15 +118,13 @@ export default function SimpleRequestApp() {
 
   const updateSongInFirestore = async (songId, songData) => {
     try {
-      // 実際のFirestore実装（運用時に有効化）
-      /*
-      const docRef = doc(db, 'songs', songId);
-      await updateDoc(docRef, {
-        ...songData,
-        updatedAt: new Date()
-      });
-      console.log('Song updated in Firestore:', songId);
-      */
+      // 実際のFirestore実装（本番環境で有効化）
+      // const docRef = doc(db, 'songs', songId);
+      // await updateDoc(docRef, {
+      //   ...songData,
+      //   updatedAt: new Date()
+      // });
+      // console.log('Song updated in Firestore:', songId);
       
       // 開発環境用のモック実装
       console.log(`[Firebase] Song updated in collection: ${songId}`, songData);
@@ -142,12 +136,10 @@ export default function SimpleRequestApp() {
 
   const deleteSongFromFirestore = async (songId) => {
     try {
-      // 実際のFirestore実装（運用時に有効化）
-      /*
-      const docRef = doc(db, 'songs', songId);
-      await deleteDoc(docRef);
-      console.log('Song deleted from Firestore:', songId);
-      */
+      // 実際のFirestore実装（本番環境で有効化）
+      // const docRef = doc(db, 'songs', songId);
+      // await deleteDoc(docRef);
+      // console.log('Song deleted from Firestore:', songId);
       
       // 開発環境用のモック実装
       console.log(`[Firebase] Song deleted from collection: ${songId}`);
@@ -253,29 +245,21 @@ export default function SimpleRequestApp() {
       setLoadingFirebase(true);
       
       try {
-        // 実際のFirestore実装（運用時に有効化）
-        /*
-        // Firestoreからすべてのデータを読み込み
-        const [songsSnapshot, publishedSnapshot] = await Promise.all([
-          getDocs(collection(db, 'songs')),
-          getDocs(collection(db, 'published-songs'))
-        ]);
+        // 実際のFirestore実装（本番環境で有効化）
+        // const [songsSnapshot, publishedSnapshot] = await Promise.all([
+        //   getDocs(collection(db, 'songs')),
+        //   getDocs(collection(db, 'published-songs'))
+        // ]);
+        // const loadedSongs = songsSnapshot.docs.map(doc => ({
+        //   id: doc.id,
+        //   ...doc.data()
+        // }));
+        // const loadedPublished = publishedSnapshot.docs.map(doc => ({
+        //   id: doc.id,
+        //   ...doc.data()
+        // }));
         
-        const loadedSongs = songsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        const loadedPublished = publishedSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setSongs(loadedSongs.length > 0 ? loadedSongs : initialSongs);
-        setPublishedSongs(loadedPublished.length > 0 ? loadedPublished : initialSongs);
-        */
-        
-        // 開発環境用の実装
+        // 開発環境用の実装（ローカルストレージ + メモリ）
         const [loadedSongs, loadedPublished, loadedMessage, loadedDarkMode] = await Promise.all([
           loadFromFirebase('songs', initialSongs),
           loadFromFirebase('publishedSongs', initialSongs),
@@ -283,8 +267,21 @@ export default function SimpleRequestApp() {
           loadFromFirebase('isDarkMode', true)
         ]);
 
-        setSongs(loadedSongs);
-        setPublishedSongs(loadedPublished);
+        // データの有効性をチェック
+        if (Array.isArray(loadedSongs) && loadedSongs.length > 0) {
+          setSongs(loadedSongs);
+        } else {
+          await saveToFirebase('songs', initialSongs);
+          setSongs(initialSongs);
+        }
+        
+        if (Array.isArray(loadedPublished) && loadedPublished.length > 0) {
+          setPublishedSongs(loadedPublished);
+        } else {
+          await saveToFirebase('publishedSongs', initialSongs);
+          setPublishedSongs(initialSongs);
+        }
+        
         setAdminMessage(loadedMessage);
         setIsDarkMode(loadedDarkMode);
 
