@@ -249,28 +249,6 @@ export default function SimpleRequestApp() {
   return (
     <div className={`min-h-screen ${currentTheme.background}`}>
       <div className="container mx-auto px-3 py-3 max-w-7xl">
-        
-        <div className="mb-3 space-y-2">
-          <div className={`p-3 rounded text-sm flex items-center ${firebaseConnected ? 'bg-green-500/20 border border-green-500/30 text-green-300' : 'bg-red-500/20 border border-red-500/30 text-red-300'}`}>
-            <div className="flex items-center space-x-2">
-              {firebaseConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-              <span>{firebaseConnected ? '🔥 Firebase接続成功' : '⚠️ Firebase未接続'}</span>
-            </div>
-          </div>
-          
-          <div className={`p-3 rounded text-sm flex items-center ${databaseConnected ? 'bg-blue-500/20 border border-blue-500/30 text-blue-300' : 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-300'}`}>
-            <div className="flex items-center space-x-2">
-              <Database className="w-4 h-4" />
-              <span>{databaseConnected ? '📊 データベース接続成功' : '📊 データベース未設定'}</span>
-            </div>
-          </div>
-          
-          {lastSyncTime && (
-            <div className={`text-xs ${currentTheme.textTertiary} text-center`}>
-              最終同期: {lastSyncTime.toLocaleString()}
-            </div>
-          )}
-        </div>
 
         <div className={`${currentTheme.card} rounded-lg p-3 mb-3 border`}>
           <div className="flex items-center justify-between">
@@ -581,3 +559,133 @@ export default function SimpleRequestApp() {
                       <option key={genre} value={genre}>{genre}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={addSong}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                  disabled={!newSong.title || !newSong.artist}
+                >
+                  追加
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showMessageEditModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">メッセージ編集</h3>
+              
+              <textarea
+                value={tempAdminMessage}
+                onChange={(e) => setTempAdminMessage(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder="配信者からのメッセージを入力"
+                rows="4"
+              />
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={() => {
+                    saveAdminMessageToFirebase(tempAdminMessage);
+                    setShowMessageEditModal(false);
+                  }}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                >
+                  保存
+                </button>
+                <button
+                  onClick={() => setShowMessageEditModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showEditModal && editingSong && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲編集</h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
+                  <input
+                    type="text"
+                    value={editingSong.title}
+                    onChange={(e) => setEditingSong({...editingSong, title: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="楽曲名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
+                  <input
+                    type="text"
+                    value={editingSong.artist}
+                    onChange={(e) => setEditingSong({...editingSong, artist: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="アーティスト名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
+                  <select
+                    value={editingSong.genre}
+                    onChange={(e) => setEditingSong({...editingSong, genre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">ジャンルを選択</option>
+                    {availableGenres.map(genre => (
+                      <option key={genre} value={genre}>{genre}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={async () => {
+                    if (!editingSong.title || !editingSong.artist) return;
+                    const updatedSongs = songs.map(song => song.id === editingSong.id ? {...song, ...editingSong} : song);
+                    await saveSongsToFirebase(updatedSongs);
+                    setShowEditModal(false);
+                    setEditingSong(null);
+                  }}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                  disabled={!editingSong.title || !editingSong.artist}
+                >
+                  保存
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingSong(null);
+                  }}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
