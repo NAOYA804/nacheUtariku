@@ -172,6 +172,7 @@ export default function SimpleRequestApp() {
   const [newSong, setNewSong] = useState({
     title: '',
     artist: '',
+    reading: '',
     genre: '',
     tags: [],
     memo: ''
@@ -410,7 +411,7 @@ export default function SimpleRequestApp() {
       const updatedSongs = [...songs, songToAdd];
       await saveSongsToFirebase(updatedSongs);
       
-      setNewSong({ title: '', artist: '', genre: '', tags: [], memo: '' });
+      setNewSong({ title: '', artist: '', reading: '', genre: '', tags: [], memo: '' });
       setShowAddModal(false);
       console.log('[Firebase] Song added successfully:', songToAdd);
     } catch (error) {
@@ -727,6 +728,17 @@ export default function SimpleRequestApp() {
                 </div>
                 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
+                  <input
+                    type="text"
+                    value={newSong.reading || ''}
+                    onChange={(e) => setNewSong({...newSong, reading: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="よみがなを入力"
+                  />
+                </div>
+                
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
                   <input
                     type="text"
@@ -749,6 +761,49 @@ export default function SimpleRequestApp() {
                       <option key={genre} value={genre}>{genre}</option>
                     ))}
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
+                  <input
+                    type="text"
+                    value={Array.isArray(newSong.tags) ? newSong.tags.join(', ') : ''}
+                    onChange={(e) => setNewSong({...newSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="タグをカンマ区切りで入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                  <textarea
+                    value={newSong.memo || ''}
+                    onChange={(e) => setNewSong({...newSong, memo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="メモを入力"
+                    rows="2"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={addSong}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                  disabled={!newSong.title || !newSong.artist}
+                >
+                  追加
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
                 </div>
               </div>
               
@@ -823,6 +878,17 @@ export default function SimpleRequestApp() {
                 </div>
                 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
+                  <input
+                    type="text"
+                    value={editingSong.reading || ''}
+                    onChange={(e) => setEditingSong({...editingSong, reading: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="よみがなを入力"
+                  />
+                </div>
+                
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
                   <input
                     type="text"
@@ -845,6 +911,28 @@ export default function SimpleRequestApp() {
                       <option key={genre} value={genre}>{genre}</option>
                     ))}
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
+                  <input
+                    type="text"
+                    value={Array.isArray(editingSong.tags) ? editingSong.tags.join(', ') : ''}
+                    onChange={(e) => setEditingSong({...editingSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="タグをカンマ区切りで入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                  <textarea
+                    value={editingSong.memo || ''}
+                    onChange={(e) => setEditingSong({...editingSong, memo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="メモを入力"
+                    rows="2"
+                  />
                 </div>
               </div>
               
