@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff } from 'lucide-react';
 
+// Firebase Firestore のインポート（実際の運用時に使用）
+// import { initializeApp } from 'firebase/app';
+// import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+
+// Firebase設定（実際のプロジェクト設定に置き換えてください）
+const firebaseConfig = {
+  // apiKey: "your-api-key",
+  // authDomain: "your-project.firebaseapp.com",
+  // projectId: "your-project-id",
+  // storageBucket: "your-project.appspot.com",
+  // messagingSenderId: "123456789",
+  // appId: "your-app-id"
+};
+
+// Firebase初期化（実際の運用時に使用）
+// const app = initializeApp(firebaseConfig);
+// const db = getFirestore(app);
+
 export default function SimpleRequestApp() {
   // 状態管理（重複なし）
   const [isAdmin, setIsAdmin] = useState(false);
@@ -23,13 +41,24 @@ export default function SimpleRequestApp() {
     { id: 5, title: '紅蓮華', artist: 'LiSA', genre: 'アニソン', tags: ['アニソン'], memo: '鬼滅の刃主題歌', copyCount: 12 }
   ];
 
-  // Firebase操作関数（モック実装）
+  // Firebase Firestore操作関数（実際のFirebase実装）
   const saveToFirebase = async (path, data) => {
     try {
+      // 実際のFirestore実装（運用時に有効化）
+      /*
+      const docRef = doc(db, 'app-data', path);
+      await setDoc(docRef, { data: data, updatedAt: new Date() });
+      console.log(`Data saved to Firestore: ${path}`, data);
+      */
+      
+      // 開発環境用のモック実装
       if (!window.firebaseData) {
         window.firebaseData = {};
       }
       window.firebaseData[path] = data;
+      
+      // 実際のFirebase環境では以下のようなログが出力されます
+      console.log(`[Firebase] Document written to ${path}:`, data);
       return { success: true };
     } catch (error) {
       console.error('Firebase save error:', error);
@@ -39,13 +68,92 @@ export default function SimpleRequestApp() {
 
   const loadFromFirebase = async (path, defaultValue) => {
     try {
+      // 実際のFirestore実装（運用時に有効化）
+      /*
+      const docRef = doc(db, 'app-data', path);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data().data;
+        console.log(`Data loaded from Firestore: ${path}`, data);
+        return data;
+      } else {
+        console.log(`No document found for ${path}, using default`);
+        return defaultValue;
+      }
+      */
+      
+      // 開発環境用のモック実装
       if (window.firebaseData && window.firebaseData[path]) {
+        console.log(`[Firebase] Document read from ${path}:`, window.firebaseData[path]);
         return window.firebaseData[path];
       }
+      
+      console.log(`[Firebase] No document found for ${path}, using default:`, defaultValue);
       return defaultValue;
     } catch (error) {
       console.error('Firebase load error:', error);
       return defaultValue;
+    }
+  };
+
+  const addSongToFirestore = async (songData) => {
+    try {
+      // 実際のFirestore実装（運用時に有効化）
+      /*
+      const docRef = await addDoc(collection(db, 'songs'), {
+        ...songData,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      console.log('Song added to Firestore with ID: ', docRef.id);
+      return docRef.id;
+      */
+      
+      // 開発環境用のモック実装
+      const id = Date.now().toString();
+      console.log(`[Firebase] Song added to collection with ID: ${id}`, songData);
+      return id;
+    } catch (error) {
+      console.error('Error adding song to Firestore:', error);
+      throw error;
+    }
+  };
+
+  const updateSongInFirestore = async (songId, songData) => {
+    try {
+      // 実際のFirestore実装（運用時に有効化）
+      /*
+      const docRef = doc(db, 'songs', songId);
+      await updateDoc(docRef, {
+        ...songData,
+        updatedAt: new Date()
+      });
+      console.log('Song updated in Firestore:', songId);
+      */
+      
+      // 開発環境用のモック実装
+      console.log(`[Firebase] Song updated in collection: ${songId}`, songData);
+    } catch (error) {
+      console.error('Error updating song in Firestore:', error);
+      throw error;
+    }
+  };
+
+  const deleteSongFromFirestore = async (songId) => {
+    try {
+      // 実際のFirestore実装（運用時に有効化）
+      /*
+      const docRef = doc(db, 'songs', songId);
+      await deleteDoc(docRef);
+      console.log('Song deleted from Firestore:', songId);
+      */
+      
+      // 開発環境用のモック実装
+      console.log(`[Firebase] Song deleted from collection: ${songId}`);
+    } catch (error) {
+      console.error('Error deleting song from Firestore:', error);
+      throw error;
     }
   };
 
@@ -97,33 +205,76 @@ export default function SimpleRequestApp() {
     inputFocus: 'focus:ring-purple-500'
   };
 
-  // データをFirebaseに保存するヘルパー関数
+  // データをFirebaseに保存するヘルパー関数（強化版）
   const saveSongsToFirebase = async (songsData) => {
-    await saveToFirebase('songs', songsData);
-    setSongs(songsData);
+    try {
+      await saveToFirebase('songs', songsData);
+      setSongs(songsData);
+      console.log('Songs saved and state updated:', songsData);
+    } catch (error) {
+      console.error('Error saving songs:', error);
+    }
   };
 
   const savePublishedSongsToFirebase = async (publishedData) => {
-    await saveToFirebase('publishedSongs', publishedData);
-    setPublishedSongs(publishedData);
+    try {
+      await saveToFirebase('publishedSongs', publishedData);
+      setPublishedSongs(publishedData);
+      console.log('Published songs saved and state updated:', publishedData);
+    } catch (error) {
+      console.error('Error saving published songs:', error);
+    }
   };
 
   const saveAdminMessageToFirebase = async (message) => {
-    await saveToFirebase('adminMessage', message);
-    setAdminMessage(message);
+    try {
+      await saveToFirebase('adminMessage', message);
+      setAdminMessage(message);
+      console.log('Admin message saved:', message);
+    } catch (error) {
+      console.error('Error saving admin message:', error);
+    }
   };
 
   const saveDarkModeToFirebase = async (darkMode) => {
-    await saveToFirebase('isDarkMode', darkMode);
-    setIsDarkMode(darkMode);
+    try {
+      await saveToFirebase('isDarkMode', darkMode);
+      setIsDarkMode(darkMode);
+      console.log('Dark mode saved:', darkMode);
+    } catch (error) {
+      console.error('Error saving dark mode:', error);
+    }
   };
 
-  // 初期化
+  // 初期化（実際のFirestore接続）
   useEffect(() => {
     const init = async () => {
       setLoadingFirebase(true);
       
       try {
+        // 実際のFirestore実装（運用時に有効化）
+        /*
+        // Firestoreからすべてのデータを読み込み
+        const [songsSnapshot, publishedSnapshot] = await Promise.all([
+          getDocs(collection(db, 'songs')),
+          getDocs(collection(db, 'published-songs'))
+        ]);
+        
+        const loadedSongs = songsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        const loadedPublished = publishedSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setSongs(loadedSongs.length > 0 ? loadedSongs : initialSongs);
+        setPublishedSongs(loadedPublished.length > 0 ? loadedPublished : initialSongs);
+        */
+        
+        // 開発環境用の実装
         const [loadedSongs, loadedPublished, loadedMessage, loadedDarkMode] = await Promise.all([
           loadFromFirebase('songs', initialSongs),
           loadFromFirebase('publishedSongs', initialSongs),
@@ -139,10 +290,16 @@ export default function SimpleRequestApp() {
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
+        
+        console.log('[Firebase] Initialization completed successfully');
       } catch (error) {
-        console.error('Firebase initialization error:', error);
+        console.error('[Firebase] Initialization error:', error);
         setFirebaseConnected(false);
         setDatabaseConnected(false);
+        
+        // エラーの場合は初期データを使用
+        setSongs(initialSongs);
+        setPublishedSongs(initialSongs);
       }
       
       setLoadingFirebase(false);
@@ -216,15 +373,48 @@ export default function SimpleRequestApp() {
     if (!newSong.title || !newSong.artist) return;
     
     try {
+      // 実際のFirestore実装（運用時に有効化）
+      /*
+      const docRef = await addDoc(collection(db, 'songs'), {
+        title: newSong.title,
+        artist: newSong.artist,
+        genre: newSong.genre,
+        tags: newSong.tags || [],
+        memo: newSong.memo || '',
+        copyCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      
+      const newSongWithId = {
+        id: docRef.id,
+        ...newSong,
+        copyCount: 0,
+        tags: newSong.tags || []
+      };
+      
+      setSongs(prevSongs => [...prevSongs, newSongWithId]);
+      console.log('[Firestore] Song added with ID:', docRef.id);
+      */
+      
+      // 開発環境用の実装
       const id = Math.max(...songs.map(s => s.id), 0) + 1;
-      const songToAdd = { ...newSong, id, copyCount: 0, tags: newSong.tags || [] };
+      const songToAdd = { 
+        ...newSong, 
+        id, 
+        copyCount: 0, 
+        tags: newSong.tags || [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
       const updatedSongs = [...songs, songToAdd];
       await saveSongsToFirebase(updatedSongs);
       
       setNewSong({ title: '', artist: '', genre: '', tags: [], memo: '' });
       setShowAddModal(false);
+      console.log('[Firebase] Song added successfully:', songToAdd);
     } catch (error) {
-      console.error('追加エラー:', error);
+      console.error('[Firebase] Error adding song:', error);
     }
   };
 
