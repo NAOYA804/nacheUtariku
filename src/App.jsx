@@ -1,24 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff, Star, StarOff, BarChart3, Download, Upload, Filter, SortAsc, SortDesc, Heart, Clock, TrendingUp, PieChart, Calendar, Users } from 'lucide-react';
+import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff, Star, StarOff, BarChart3, Download, Upload, Filter, SortAsc, SortDesc, Heart, Clock, TrendingUp, PieChart, Calendar, Users, Plus } from 'lucide-react';
 
-// Firebase Firestore のインポート（実際の運用時に使用）
-// import { initializeApp } from 'firebase/app';
-// import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
-
-// Firebase設定（実際のプロジェクト設定に置き換えてください）
+// Firebase設定
 const firebaseConfig = {
-  // apiKey: "your-api-key",
-  // authDomain: "your-project.firebaseapp.com",
-  // projectId: "your-project-id",
-  // storageBucket: "your-project.appspot.com",
-  // messagingSenderId: "123456789",
-  // appId: "your-app-id"
+  apiKey: "AIzaSyDemo-Replace-With-Your-Actual-API-Key",
+  authDomain: "music-request-app.firebaseapp.com",
+  projectId: "music-request-app",
+  storageBucket: "music-request-app.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abcdef1234567890"
 };
 
-// Firebase初期化（実際の運用時に使用）
-// const app = initializeApp(firebaseConfig);
-// const db = getFirestore(app);
+// Firebase変数
+let firebaseApp = null;
+let db = null;
 
+// FirebaseをCDNから動的に読み込む関数
+const loadFirebaseSDK = () => {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      reject(new Error('Window is not available'));
+      return;
+    }
+
+    // 既に読み込み済みの場合
+    if (window.firebase) {
+      resolve(window.firebase);
+      return;
+    }
+
+    // Firebase App SDKを読み込み
+    const appScript = document.createElement('script');
+    appScript.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+    appScript.onload = () => {
+      // Firebase Firestore SDKを読み込み
+      const firestoreScript = document.createElement('script');
+      firestoreScript.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';
+      firestoreScript.onload = () => {
+        resolve(window.firebase);
+      };
+      firestoreScript.onerror = () => reject(new Error('Failed to load Firestore SDK'));
+      document.head.appendChild(firestoreScript);
+    };
+    appScript.onerror = () => reject(new Error('Failed to load Firebase App SDK'));
+    document.head.appendChild(appScript);
+  });
+};
+
+// Firebaseの初期化関数
+const initializeFirebase = async () => {
+  try {
+    if (firebaseApp) {
+      return true; // 既に初期化済み
+    }
+
+    console.log('Loading Firebase SDK...');
+    const firebase = await loadFirebaseSDK();
+    
+    console.log('Initializing Firebase...');
+    firebaseApp = firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    
+    console.log('Firebase initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('Firebase initialization error:', error);
+    return false;
+  }
+};
+
+// 🎵 Firebase対応の楽曲管理システム
 export default function EnhancedMusicRequestApp() {
   // 状態管理（重複なし）
   const [isAdmin, setIsAdmin] = useState(false);
@@ -32,24 +83,21 @@ export default function EnhancedMusicRequestApp() {
   const [showPublishMessage, setShowPublishMessage] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
 
-  // 新機能：表示モード
-  const [viewMode, setViewMode] = useState('table'); // 'table' | 'card' | 'stats'
-  const [sortBy, setSortBy] = useState('title'); // 'title' | 'artist' | 'copyCount' | 'rating' | 'createdAt'
+  // 表示・フィルター機能
+  const [sortBy, setSortBy] = useState('title'); // 'title' | 'artist' | 'copyCount' | 'createdAt'
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc'
   const [filterGenre, setFilterGenre] = useState('');
-  const [filterRating, setFilterRating] = useState(0);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [showSpecialtyOnly, setShowSpecialtyOnly] = useState(false);
 
-  // 新機能：統計とプレイリスト
+  // 統計とプレイリスト
   const [showStatsModal, setShowStatsModal] = useState(false);
-  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [showBulkAddModal, setShowBulkAddModal] = useState(false);
   const [playlists, setPlaylists] = useState([
     { id: 1, name: '人気楽曲', songs: [], description: '最もリクエストされた楽曲' },
     { id: 2, name: 'バラード集', songs: [], description: 'しっとりとしたバラード楽曲' }
   ]);
-  const [currentPlaylist, setCurrentPlaylist] = useState(null);
 
-  // データの初期値（強化版：お気に入り、評価、キー情報、プレイリスト対応）
+  // データの初期値（簡素化版：得意機能のみ）
   const initialSongs = [
     { 
       id: 1, 
@@ -60,11 +108,7 @@ export default function EnhancedMusicRequestApp() {
       tags: ['バラード'], 
       memo: '', 
       copyCount: 2,
-      isFavorite: false,
-      rating: 4,
-      key: 'C',
-      difficulty: 3,
-      duration: '4:15',
+      isSpecialty: false,
       createdAt: new Date('2024-01-15'),
       lastRequested: new Date('2024-06-20')
     },
@@ -77,11 +121,7 @@ export default function EnhancedMusicRequestApp() {
       tags: ['沖縄'], 
       memo: '', 
       copyCount: 5,
-      isFavorite: true,
-      rating: 5,
-      key: 'G',
-      difficulty: 2,
-      duration: '5:22',
+      isSpecialty: true,
       createdAt: new Date('2024-01-20'),
       lastRequested: new Date('2024-06-25')
     },
@@ -94,11 +134,7 @@ export default function EnhancedMusicRequestApp() {
       tags: ['卒業'], 
       memo: '', 
       copyCount: 8,
-      isFavorite: false,
-      rating: 4,
-      key: 'D',
-      difficulty: 2,
-      duration: '5:03',
+      isSpecialty: false,
       createdAt: new Date('2024-02-01'),
       lastRequested: new Date('2024-06-27')
     },
@@ -111,11 +147,7 @@ export default function EnhancedMusicRequestApp() {
       tags: ['ボカロ系'], 
       memo: '人気曲', 
       copyCount: 15,
-      isFavorite: true,
-      rating: 5,
-      key: 'Am',
-      difficulty: 4,
-      duration: '4:23',
+      isSpecialty: true,
       createdAt: new Date('2024-02-10'),
       lastRequested: new Date('2024-06-27')
     },
@@ -128,41 +160,107 @@ export default function EnhancedMusicRequestApp() {
       tags: ['アニソン'], 
       memo: '鬼滅の刃主題歌', 
       copyCount: 12,
-      isFavorite: false,
-      rating: 5,
-      key: 'Em',
-      difficulty: 5,
-      duration: '4:04',
+      isSpecialty: false,
       createdAt: new Date('2024-02-15'),
       lastRequested: new Date('2024-06-26')
     }
   ];
 
-  // Firebase Firestore操作関数（既存機能保持）
-  const saveToFirebase = async (path, data) => {
+  // Firebaseストレージ操作関数
+  const saveToFirestore = async (collection, data) => {
     try {
-      if (!window.firebaseData) {
-        window.firebaseData = {};
+      if (!db) {
+        console.log('Firestore not available, using localStorage');
+        return await saveToLocalStorage(collection, data);
       }
-      window.firebaseData[path] = data;
-      console.log(`[Firebase] Document written to ${path}:`, data);
+      
+      console.log(`Saving to Firestore collection: ${collection}`);
+      
+      // Firestoreに保存
+      await db.collection('musicApp').doc(collection).set({
+        data: data,
+        updatedAt: new Date(),
+        version: 1
+      });
+      
+      console.log(`[Firestore] Data saved to ${collection}:`, data);
+      
+      // ローカルストレージにもバックアップ保存
+      await saveToLocalStorage(collection, data);
+      
+      return { success: true, source: 'firestore' };
+    } catch (error) {
+      console.error('Firestore save error:', error);
+      // エラー時はローカルストレージにフォールバック
+      const result = await saveToLocalStorage(collection, data);
+      return { ...result, source: 'localStorage' };
+    }
+  };
+
+  const loadFromFirestore = async (collection, defaultValue) => {
+    try {
+      if (!db) {
+        console.log('Firestore not available, using localStorage');
+        return await loadFromLocalStorage(collection, defaultValue);
+      }
+      
+      console.log(`Loading from Firestore collection: ${collection}`);
+      
+      // Firestoreから読み込み
+      const doc = await db.collection('musicApp').doc(collection).get();
+      
+      if (doc.exists) {
+        const firestoreData = doc.data().data;
+        console.log(`[Firestore] Data loaded from ${collection}:`, firestoreData);
+        
+        // ローカルストレージにもキャッシュ保存
+        await saveToLocalStorage(collection, firestoreData);
+        
+        return firestoreData;
+      } else {
+        console.log(`No data found in Firestore for ${collection}, checking localStorage`);
+        // Firestoreにデータがない場合はローカルストレージから読み込み
+        const localData = await loadFromLocalStorage(collection, defaultValue);
+        
+        // ローカルにデータがあればFirestoreに同期
+        if (localData !== defaultValue) {
+          console.log(`Syncing localStorage data to Firestore for ${collection}`);
+          await saveToFirestore(collection, localData);
+        }
+        
+        return localData;
+      }
+    } catch (error) {
+      console.error('Firestore load error:', error);
+      // エラー時はローカルストレージから読み込み
+      return await loadFromLocalStorage(collection, defaultValue);
+    }
+  };
+
+  // ローカルストレージ操作関数（バックアップ用）
+  const saveToLocalStorage = async (key, data) => {
+    try {
+      localStorage.setItem(`musicApp_${key}`, JSON.stringify(data));
+      console.log(`[LocalStorage] Data saved to ${key}:`, data);
       return { success: true };
     } catch (error) {
-      console.error('Firebase save error:', error);
+      console.error('LocalStorage save error:', error);
       return { success: false, error };
     }
   };
 
-  const loadFromFirebase = async (path, defaultValue) => {
+  const loadFromLocalStorage = async (key, defaultValue) => {
     try {
-      if (window.firebaseData && window.firebaseData[path]) {
-        console.log(`[Firebase] Document read from ${path}:`, window.firebaseData[path]);
-        return window.firebaseData[path];
+      const stored = localStorage.getItem(`musicApp_${key}`);
+      if (stored) {
+        const data = JSON.parse(stored);
+        console.log(`[LocalStorage] Data loaded from ${key}:`, data);
+        return data;
       }
-      console.log(`[Firebase] No document found for ${path}, using default:`, defaultValue);
+      console.log(`[LocalStorage] No data found for ${key}, using default:`, defaultValue);
       return defaultValue;
     } catch (error) {
-      console.error('Firebase load error:', error);
+      console.error('LocalStorage load error:', error);
       return defaultValue;
     }
   };
@@ -185,12 +283,9 @@ export default function EnhancedMusicRequestApp() {
     reading: '',
     genre: '',
     tags: [],
-    memo: '',
-    key: '',
-    difficulty: 1,
-    duration: '',
-    rating: 0
+    memo: ''
   });
+  const [bulkSongText, setBulkSongText] = useState('');
   const [availableGenres] = useState(['J-POP', 'アニソン', 'ロック', 'バラード', '演歌', 'クラシック', 'ボカロ', 'インスト']);
 
   // テーマ設定（既存機能保持）
@@ -220,70 +315,132 @@ export default function EnhancedMusicRequestApp() {
     inputFocus: 'focus:ring-purple-500'
   };
 
-  // データをFirebaseに保存するヘルパー関数（既存機能保持）
-  const saveSongsToFirebase = async (songsData) => {
+  // データをFirestoreに保存するヘルパー関数
+  const saveSongsToStorage = async (songsData) => {
     try {
-      await saveToFirebase('songs', songsData);
+      const result = await saveToFirestore('songs', songsData);
       setSongs(songsData);
+      
+      // 接続状態を更新
+      if (result.source === 'firestore') {
+        setFirebaseConnected(true);
+        setDatabaseConnected(true);
+        setLastSyncTime(new Date());
+      }
+      
       console.log('Songs saved and state updated:', songsData);
     } catch (error) {
       console.error('Error saving songs:', error);
+      setFirebaseConnected(false);
     }
   };
 
-  const savePublishedSongsToFirebase = async (publishedData) => {
+  const savePublishedSongsToStorage = async (publishedData) => {
     try {
-      await saveToFirebase('publishedSongs', publishedData);
+      const result = await saveToFirestore('publishedSongs', publishedData);
       setPublishedSongs(publishedData);
+      
+      // 接続状態を更新
+      if (result.source === 'firestore') {
+        setFirebaseConnected(true);
+        setDatabaseConnected(true);
+        setLastSyncTime(new Date());
+      }
+      
       console.log('Published songs saved and state updated:', publishedData);
     } catch (error) {
       console.error('Error saving published songs:', error);
+      setFirebaseConnected(false);
     }
   };
 
-  const saveAdminMessageToFirebase = async (message) => {
+  const saveAdminMessageToStorage = async (message) => {
     try {
-      await saveToFirebase('adminMessage', message);
+      const result = await saveToFirestore('adminMessage', message);
       setAdminMessage(message);
+      
+      // 接続状態を更新
+      if (result.source === 'firestore') {
+        setFirebaseConnected(true);
+        setDatabaseConnected(true);
+        setLastSyncTime(new Date());
+      }
+      
       console.log('Admin message saved:', message);
     } catch (error) {
       console.error('Error saving admin message:', error);
+      setFirebaseConnected(false);
     }
   };
 
-  const saveDarkModeToFirebase = async (darkMode) => {
+  const saveDarkModeToStorage = async (darkMode) => {
     try {
-      await saveToFirebase('isDarkMode', darkMode);
+      const result = await saveToFirestore('isDarkMode', darkMode);
       setIsDarkMode(darkMode);
+      
+      // 接続状態を更新
+      if (result.source === 'firestore') {
+        setFirebaseConnected(true);
+        setDatabaseConnected(true);
+        setLastSyncTime(new Date());
+      }
+      
       console.log('Dark mode saved:', darkMode);
     } catch (error) {
       console.error('Error saving dark mode:', error);
+      setFirebaseConnected(false);
     }
   };
 
-  // 新機能：プレイリスト保存
-  const savePlaylistsToFirebase = async (playlistData) => {
+  // プレイリスト保存
+  const savePlaylistsToStorage = async (playlistData) => {
     try {
-      await saveToFirebase('playlists', playlistData);
+      const result = await saveToFirestore('playlists', playlistData);
       setPlaylists(playlistData);
+      
+      // 接続状態を更新
+      if (result.source === 'firestore') {
+        setFirebaseConnected(true);
+        setDatabaseConnected(true);
+        setLastSyncTime(new Date());
+      }
+      
       console.log('Playlists saved:', playlistData);
     } catch (error) {
       console.error('Error saving playlists:', error);
+      setFirebaseConnected(false);
     }
   };
 
-  // 初期化（既存機能保持 + 新機能追加）
+  // 初期化（Firebase + ローカルストレージ対応）
   useEffect(() => {
     const init = async () => {
       setLoadingFirebase(true);
       
       try {
+        // Firebaseを初期化
+        const firebaseInitialized = await initializeFirebase();
+        
+        if (firebaseInitialized) {
+          console.log('[Firebase] Initialization successful');
+          setFirebaseConnected(true);
+          setDatabaseConnected(true);
+        } else {
+          console.log('[Firebase] Initialization failed, using localStorage only');
+          setFirebaseConnected(false);
+          setDatabaseConnected(false);
+        }
+
+        // データを読み込み（Firestore優先、フォールバックでローカルストレージ）
         const [loadedSongs, loadedPublished, loadedMessage, loadedDarkMode, loadedPlaylists] = await Promise.all([
-          loadFromFirebase('songs', initialSongs),
-          loadFromFirebase('publishedSongs', initialSongs),
-          loadFromFirebase('adminMessage', '配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪'),
-          loadFromFirebase('isDarkMode', true),
-          loadFromFirebase('playlists', playlists)
+          loadFromFirestore('songs', initialSongs),
+          loadFromFirestore('publishedSongs', initialSongs),
+          loadFromFirestore('adminMessage', '配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪'),
+          loadFromFirestore('isDarkMode', true),
+          loadFromFirestore('playlists', [
+            { id: 1, name: '人気楽曲', songs: [], description: '最もリクエストされた楽曲' },
+            { id: 2, name: 'バラード集', songs: [], description: 'しっとりとしたバラード楽曲' }
+          ])
         ]);
 
         setSongs(loadedSongs);
@@ -292,16 +449,17 @@ export default function EnhancedMusicRequestApp() {
         setIsDarkMode(loadedDarkMode);
         setPlaylists(loadedPlaylists);
 
-        setFirebaseConnected(true);
-        setDatabaseConnected(true);
-        setLastSyncTime(new Date());
+        if (firebaseInitialized) {
+          setLastSyncTime(new Date());
+        }
         
-        console.log('[Firebase] Initialization completed successfully');
+        console.log('[Storage] Initialization completed successfully');
       } catch (error) {
-        console.error('[Firebase] Initialization error:', error);
+        console.error('[Storage] Initialization error:', error);
         setFirebaseConnected(false);
         setDatabaseConnected(false);
         
+        // エラー時は初期データを使用
         setSongs(initialSongs);
         setPublishedSongs(initialSongs);
       }
@@ -310,7 +468,7 @@ export default function EnhancedMusicRequestApp() {
     };
     
     init();
-  }, []);
+  }, []); // 空の依存配列で初回のみ実行
 
   // 計算プロパティ（強化版）
   const displayedSongs = isAdmin ? songs : publishedSongs;
@@ -328,10 +486,9 @@ export default function EnhancedMusicRequestApp() {
              (song.memo && song.memo.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesGenre = filterGenre === '' || song.genre === filterGenre;
-      const matchesRating = filterRating === 0 || song.rating >= filterRating;
-      const matchesFavorites = !showFavoritesOnly || song.isFavorite;
+      const matchesSpecialty = !showSpecialtyOnly || song.isSpecialty;
       
-      return matchesSearch && matchesGenre && matchesRating && matchesFavorites;
+      return matchesSearch && matchesGenre && matchesSpecialty;
     });
 
     // ソート機能
@@ -350,10 +507,6 @@ export default function EnhancedMusicRequestApp() {
         case 'copyCount':
           aValue = a.copyCount || 0;
           bValue = b.copyCount || 0;
-          break;
-        case 'rating':
-          aValue = a.rating || 0;
-          bValue = b.rating || 0;
           break;
         case 'createdAt':
           aValue = new Date(a.createdAt || 0);
@@ -380,8 +533,7 @@ export default function EnhancedMusicRequestApp() {
   const getStatistics = () => {
     const total = displayedSongs.length;
     const totalRequests = displayedSongs.reduce((sum, song) => sum + (song.copyCount || 0), 0);
-    const averageRating = displayedSongs.reduce((sum, song) => sum + (song.rating || 0), 0) / total;
-    const favoriteCount = displayedSongs.filter(song => song.isFavorite).length;
+    const specialtyCount = displayedSongs.filter(song => song.isSpecialty).length;
     
     const genreStats = {};
     displayedSongs.forEach(song => {
@@ -391,8 +543,7 @@ export default function EnhancedMusicRequestApp() {
     return {
       total,
       totalRequests,
-      averageRating: averageRating.toFixed(1),
-      favoriteCount,
+      specialtyCount,
       genreStats
     };
   };
@@ -410,14 +561,14 @@ export default function EnhancedMusicRequestApp() {
           copyCount: (s.copyCount || 0) + 1,
           lastRequested: new Date()
         } : s);
-        await saveSongsToFirebase(updatedSongs);
+        await saveSongsToStorage(updatedSongs);
       } else {
         const updatedPublished = publishedSongs.map(s => s.id === song.id ? {
           ...s, 
           copyCount: (s.copyCount || 0) + 1,
           lastRequested: new Date()
         } : s);
-        await savePublishedSongsToFirebase(updatedPublished);
+        await savePublishedSongsToStorage(updatedPublished);
       }
       
       setTimeout(() => setCopiedSong(null), 2000);
@@ -427,45 +578,12 @@ export default function EnhancedMusicRequestApp() {
     }
   };
 
-  // 新機能：お気に入り機能
-  const toggleFavorite = async (songId) => {
+  // 得意機能
+  const toggleSpecialty = async (songId) => {
     const updatedSongs = songs.map(song => 
-      song.id === songId ? { ...song, isFavorite: !song.isFavorite } : song
+      song.id === songId ? { ...song, isSpecialty: !song.isSpecialty } : song
     );
-    await saveSongsToFirebase(updatedSongs);
-  };
-
-  // 新機能：評価機能
-  const updateRating = async (songId, rating) => {
-    const updatedSongs = songs.map(song => 
-      song.id === songId ? { ...song, rating } : song
-    );
-    await saveSongsToFirebase(updatedSongs);
-  };
-
-  // 新機能：CSVエクスポート
-  const exportToCSV = () => {
-    const headers = ['楽曲名', 'アーティスト', '読み仮名', 'ジャンル', 'タグ', 'キー', '難易度', '時間', '評価', 'リクエスト回数', 'お気に入り'];
-    const csvData = displayedSongs.map(song => [
-      song.title,
-      song.artist,
-      song.reading || '',
-      song.genre,
-      (song.tags || []).join(';'),
-      song.key || '',
-      song.difficulty || '',
-      song.duration || '',
-      song.rating || '',
-      song.copyCount || 0,
-      song.isFavorite ? 'Yes' : 'No'
-    ]);
-    
-    const csvContent = [headers, ...csvData].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'songs_export.csv';
-    link.click();
+    await saveSongsToStorage(updatedSongs);
   };
 
   // 既存のイベントハンドラー（保持）
@@ -491,7 +609,7 @@ export default function EnhancedMusicRequestApp() {
 
   const deleteSong = async (songToDelete) => {
     const updatedSongs = songs.filter(song => song.id !== songToDelete.id);
-    await saveSongsToFirebase(updatedSongs);
+    await saveSongsToStorage(updatedSongs);
     setDeleteConfirm(null);
   };
 
@@ -505,12 +623,12 @@ export default function EnhancedMusicRequestApp() {
         id, 
         copyCount: 0, 
         tags: newSong.tags || [],
-        isFavorite: false,
+        isSpecialty: false,
         createdAt: new Date(),
         updatedAt: new Date()
       };
       const updatedSongs = [...songs, songToAdd];
-      await saveSongsToFirebase(updatedSongs);
+      await saveSongsToStorage(updatedSongs);
       
       setNewSong({ 
         title: '', 
@@ -518,167 +636,76 @@ export default function EnhancedMusicRequestApp() {
         reading: '', 
         genre: '', 
         tags: [], 
-        memo: '',
-        key: '',
-        difficulty: 1,
-        duration: '',
-        rating: 0
+        memo: ''
       });
       setShowAddModal(false);
-      console.log('[Firebase] Song added successfully:', songToAdd);
+      console.log('[LocalStorage] Song added successfully:', songToAdd);
     } catch (error) {
-      console.error('[Firebase] Error adding song:', error);
+      console.error('[LocalStorage] Error adding song:', error);
+    }
+  };
+
+  // 一括追加機能
+  const addBulkSongs = async () => {
+    if (!bulkSongText.trim()) return;
+    
+    try {
+      const lines = bulkSongText.trim().split('\n');
+      const newSongs = [];
+      let maxId = Math.max(...songs.map(s => s.id), 0);
+      
+      lines.forEach((line, index) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return;
+        
+        // 形式: "楽曲名 - アーティスト名" または "楽曲名,アーティスト名"
+        let title, artist;
+        if (trimmedLine.includes(' - ')) {
+          [title, artist] = trimmedLine.split(' - ').map(s => s.trim());
+        } else if (trimmedLine.includes(',')) {
+          [title, artist] = trimmedLine.split(',').map(s => s.trim());
+        } else {
+          // アーティスト名がない場合は楽曲名のみ
+          title = trimmedLine;
+          artist = '不明';
+        }
+        
+        if (title) {
+          maxId++;
+          newSongs.push({
+            id: maxId,
+            title,
+            artist: artist || '不明',
+            reading: '',
+            genre: '',
+            tags: [],
+            memo: '',
+            copyCount: 0,
+            isSpecialty: false,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+        }
+      });
+      
+      if (newSongs.length > 0) {
+        const updatedSongs = [...songs, ...newSongs];
+        await saveSongsToStorage(updatedSongs);
+        setBulkSongText('');
+        setShowBulkAddModal(false);
+        console.log(`[LocalStorage] ${newSongs.length} songs added successfully`);
+      }
+    } catch (error) {
+      console.error('[LocalStorage] Error adding bulk songs:', error);
     }
   };
 
   const publishSongs = async () => {
-    await savePublishedSongsToFirebase([...songs]);
+    await savePublishedSongsToStorage([...songs]);
     setLastSyncTime(new Date());
     setShowPublishMessage(true);
     setTimeout(() => setShowPublishMessage(false), 3000);
   };
-
-  // 星評価コンポーネント
-  const StarRating = ({ rating, onRatingChange, readOnly = false, size = 'w-4 h-4' }) => {
-    return (
-      <div className="flex items-center space-x-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            onClick={() => !readOnly && onRatingChange && onRatingChange(star)}
-            disabled={readOnly}
-            className={`${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}
-          >
-            <Star 
-              className={`${size} ${star <= rating ? 'text-yellow-400 fill-current' : 'text-gray-400'}`}
-            />
-          </button>
-        ))}
-      </div>
-    );
-  };
-
-  // 難易度表示コンポーネント
-  const DifficultyDisplay = ({ difficulty }) => {
-    const colors = ['text-green-400', 'text-blue-400', 'text-yellow-400', 'text-orange-400', 'text-red-400'];
-    return (
-      <div className="flex items-center space-x-1">
-        {[1, 2, 3, 4, 5].map((level) => (
-          <div
-            key={level}
-            className={`w-2 h-2 rounded-full ${level <= difficulty ? colors[difficulty - 1] : 'bg-gray-400'}`}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  // カード表示コンポーネント
-  const SongCard = ({ song }) => (
-    <div className={`${currentTheme.card} rounded-lg p-4 border ${currentTheme.cardHover} transition-all`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <h3 className={`${currentTheme.text} font-medium mb-1`}>{song.title}</h3>
-          {song.reading && (
-            <p className={`${currentTheme.textTertiary} text-xs mb-1`}>{song.reading}</p>
-          )}
-          <p className={`${currentTheme.textSecondary} text-sm`}>{song.artist}</p>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={() => toggleFavorite(song.id)}
-            className={`p-1 rounded transition-colors ${song.isFavorite ? 'text-red-400' : 'text-gray-400'}`}
-          >
-            <Heart className={`w-4 h-4 ${song.isFavorite ? 'fill-current' : ''}`} />
-          </button>
-        )}
-      </div>
-      
-      <div className="flex flex-wrap gap-1 mb-3">
-        <span className={`px-2 py-1 ${isDarkMode ? 'bg-purple-500/30 text-purple-200' : 'bg-purple-100 text-purple-800'} rounded text-xs`}>
-          {song.genre}
-        </span>
-        {song.tags && song.tags.map((tag, index) => (
-          <span key={index} className={`px-2 py-1 ${isDarkMode ? 'bg-blue-500/30 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded text-xs`}>
-            {tag}
-          </span>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-        {song.key && (
-          <div className={`${currentTheme.textTertiary}`}>
-            キー: <span className={`${currentTheme.textSecondary}`}>{song.key}</span>
-          </div>
-        )}
-        {song.duration && (
-          <div className={`${currentTheme.textTertiary}`}>
-            時間: <span className={`${currentTheme.textSecondary}`}>{song.duration}</span>
-          </div>
-        )}
-        {song.difficulty && (
-          <div className={`${currentTheme.textTertiary} flex items-center space-x-2`}>
-            <span>難易度:</span>
-            <DifficultyDisplay difficulty={song.difficulty} />
-          </div>
-        )}
-        <div className={`${currentTheme.textTertiary} flex items-center space-x-2`}>
-          <span>評価:</span>
-          <StarRating 
-            rating={song.rating || 0} 
-            onRatingChange={isAdmin ? (rating) => updateRating(song.id, rating) : null}
-            readOnly={!isAdmin}
-            size="w-3 h-3"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        {!isAdmin ? (
-          <button
-            onClick={() => copyToClipboard(song)}
-            className={`flex items-center space-x-1 px-3 py-1 rounded text-xs flex-1 justify-center ${copiedSong === song.id ? 'bg-green-500 text-white' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'}`}
-          >
-            {copiedSong === song.id ? (
-              <>
-                <Check className="w-3 h-3" />
-                <span>済</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3 h-3" />
-                <span>リクエスト</span>
-              </>
-            )}
-          </button>
-        ) : (
-          <div className="flex space-x-2 flex-1">
-            <button
-              onClick={() => {
-                setEditingSong(song);
-                setShowEditModal(true);
-              }}
-              className="flex-1 p-2 bg-blue-500/30 hover:bg-blue-500/50 rounded text-blue-300 transition-colors"
-            >
-              <Edit className="w-4 h-4 mx-auto" />
-            </button>
-            <button
-              onClick={() => setDeleteConfirm(song)}
-              className="flex-1 p-2 bg-red-500/30 hover:bg-red-500/50 rounded text-red-300 transition-colors"
-            >
-              <Trash2 className="w-4 h-4 mx-auto" />
-            </button>
-          </div>
-        )}
-        
-        {song.copyCount > 0 && (
-          <div className={`${currentTheme.textTertiary} text-xs ml-2`}>
-            {song.copyCount}回
-          </div>
-        )}
-      </div>
-    </div>
-  );
 
   // 統計モーダル
   const StatsModal = () => {
@@ -700,354 +727,18 @@ export default function EnhancedMusicRequestApp() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-blue-50 rounded-lg p-4 text-center">
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
-                  <input
-                    type="text"
-                    value={newSong.title}
-                    onChange={(e) => setNewSong({...newSong, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="楽曲名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
-                  <input
-                    type="text"
-                    value={newSong.reading || ''}
-                    onChange={(e) => setNewSong({...newSong, reading: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="よみがなを入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
-                  <input
-                    type="text"
-                    value={newSong.artist}
-                    onChange={(e) => setNewSong({...newSong, artist: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="アーティスト名を入力"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
-                    <select
-                      value={newSong.genre}
-                      onChange={(e) => setNewSong({...newSong, genre: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                      <option value="">ジャンルを選択</option>
-                      {availableGenres.map(genre => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">キー</label>
-                    <input
-                      type="text"
-                      value={newSong.key || ''}
-                      onChange={(e) => setNewSong({...newSong, key: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      placeholder="C, Am など"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">難易度 (1-5)</label>
-                    <select
-                      value={newSong.difficulty || 1}
-                      onChange={(e) => setNewSong({...newSong, difficulty: Number(e.target.value)})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                      {[1, 2, 3, 4, 5].map(level => (
-                        <option key={level} value={level}>★{level}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">時間</label>
-                    <input
-                      type="text"
-                      value={newSong.duration || ''}
-                      onChange={(e) => setNewSong({...newSong, duration: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      placeholder="4:23"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
-                  <input
-                    type="text"
-                    value={Array.isArray(newSong.tags) ? newSong.tags.join(', ') : ''}
-                    onChange={(e) => setNewSong({...newSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="タグをカンマ区切りで入力"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">評価</label>
-                  <div className="flex items-center space-x-2">
-                    <StarRating 
-                      rating={newSong.rating || 0} 
-                      onRatingChange={(rating) => setNewSong({...newSong, rating})}
-                    />
-                    <span className="text-sm text-gray-600">{newSong.rating || 0}/5</span>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
-                  <textarea
-                    value={newSong.memo || ''}
-                    onChange={(e) => setNewSong({...newSong, memo: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="メモを入力"
-                    rows="2"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={addSong}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                  disabled={!newSong.title || !newSong.artist}
-                >
-                  追加
-                </button>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* メッセージ編集モーダル */}
-        {showMessageEditModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">メッセージ編集</h3>
-              
-              <textarea
-                value={tempAdminMessage}
-                onChange={(e) => setTempAdminMessage(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="配信者からのメッセージを入力"
-                rows="4"
-              />
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={() => {
-                    saveAdminMessageToFirebase(tempAdminMessage);
-                    setShowMessageEditModal(false);
-                  }}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                >
-                  保存
-                </button>
-                <button
-                  onClick={() => setShowMessageEditModal(false)}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 楽曲編集モーダル */}
-        {showEditModal && editingSong && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md max-h-[80vh] overflow-y-auto">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲編集</h3>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
-                  <input
-                    type="text"
-                    value={editingSong.title}
-                    onChange={(e) => setEditingSong({...editingSong, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="楽曲名を入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
-                  <input
-                    type="text"
-                    value={editingSong.reading || ''}
-                    onChange={(e) => setEditingSong({...editingSong, reading: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="よみがなを入力"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
-                  <input
-                    type="text"
-                    value={editingSong.artist}
-                    onChange={(e) => setEditingSong({...editingSong, artist: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="アーティスト名を入力"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
-                    <select
-                      value={editingSong.genre}
-                      onChange={(e) => setEditingSong({...editingSong, genre: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                      <option value="">ジャンルを選択</option>
-                      {availableGenres.map(genre => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">キー</label>
-                    <input
-                      type="text"
-                      value={editingSong.key || ''}
-                      onChange={(e) => setEditingSong({...editingSong, key: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      placeholder="C, Am など"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">難易度 (1-5)</label>
-                    <select
-                      value={editingSong.difficulty || 1}
-                      onChange={(e) => setEditingSong({...editingSong, difficulty: Number(e.target.value)})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                      {[1, 2, 3, 4, 5].map(level => (
-                        <option key={level} value={level}>★{level}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">時間</label>
-                    <input
-                      type="text"
-                      value={editingSong.duration || ''}
-                      onChange={(e) => setEditingSong({...editingSong, duration: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      placeholder="4:23"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
-                  <input
-                    type="text"
-                    value={Array.isArray(editingSong.tags) ? editingSong.tags.join(', ') : ''}
-                    onChange={(e) => setEditingSong({...editingSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="タグをカンマ区切りで入力"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">評価</label>
-                  <div className="flex items-center space-x-2">
-                    <StarRating 
-                      rating={editingSong.rating || 0} 
-                      onRatingChange={(rating) => setEditingSong({...editingSong, rating})}
-                    />
-                    <span className="text-sm text-gray-600">{editingSong.rating || 0}/5</span>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
-                  <textarea
-                    value={editingSong.memo || ''}
-                    onChange={(e) => setEditingSong({...editingSong, memo: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="メモを入力"
-                    rows="2"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <button
-                  onClick={async () => {
-                    if (!editingSong.title || !editingSong.artist) return;
-                    const updatedSongs = songs.map(song => song.id === editingSong.id ? {...song, ...editingSong} : song);
-                    await saveSongsToFirebase(updatedSongs);
-                    setShowEditModal(false);
-                    setEditingSong(null);
-                  }}
-                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                  disabled={!editingSong.title || !editingSong.artist}
-                >
-                  保存
-                </button>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingSong(null);
-                  }}
-                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}="text-2xl font-bold text-blue-600">{stats.total}</div>
+              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
               <div className="text-sm text-blue-800">総楽曲数</div>
             </div>
             <div className="bg-green-50 rounded-lg p-4 text-center">
               <div className="text-2xl font-bold text-green-600">{stats.totalRequests}</div>
               <div className="text-sm text-green-800">総リクエスト数</div>
             </div>
-            <div className="bg-yellow-50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{stats.averageRating}</div>
-              <div className="text-sm text-yellow-800">平均評価</div>
-            </div>
-            <div className="bg-red-50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.favoriteCount}</div>
-              <div className="text-sm text-red-800">お気に入り数</div>
+            <div className="bg-orange-50 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-orange-600">{stats.specialtyCount}</div>
+              <div className="text-sm text-orange-800">得意楽曲数</div>
             </div>
           </div>
 
@@ -1088,22 +779,12 @@ export default function EnhancedMusicRequestApp() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <StarRating rating={song.rating || 0} readOnly size="w-3 h-3" />
+                      {song.isSpecialty && <span className="text-orange-500 text-xs">★得意</span>}
                       <span className="text-sm text-gray-600">{song.copyCount}回</span>
                     </div>
                   </div>
                 ))}
             </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              onClick={exportToCSV}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded"
-            >
-              <Download className="w-4 h-4" />
-              <span>CSVエクスポート</span>
-            </button>
           </div>
         </div>
       </div>
@@ -1136,7 +817,7 @@ export default function EnhancedMusicRequestApp() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {/* 新機能：統計ボタン */}
+              {/* 統計ボタン */}
               <button
                 onClick={() => setShowStatsModal(true)}
                 className={`p-2 ${isDarkMode ? 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-300' : 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-600'} rounded transition-colors`}
@@ -1144,26 +825,10 @@ export default function EnhancedMusicRequestApp() {
               >
                 <BarChart3 className="w-4 h-4" />
               </button>
-              
-              {/* 新機能：表示モード切り替え */}
-              <div className="flex rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`p-2 text-xs ${viewMode === 'table' ? 'bg-purple-500 text-white' : 'bg-gray-500/30 text-gray-400'} transition-colors`}
-                >
-                  テーブル
-                </button>
-                <button
-                  onClick={() => setViewMode('card')}
-                  className={`p-2 text-xs ${viewMode === 'card' ? 'bg-purple-500 text-white' : 'bg-gray-500/30 text-gray-400'} transition-colors`}
-                >
-                  カード
-                </button>
-              </div>
 
               <button
                 onClick={() => {
-                  saveDarkModeToFirebase(!isDarkMode);
+                  saveDarkModeToStorage(!isDarkMode);
                 }}
                 className={`p-2 ${isDarkMode ? 'bg-yellow-500/30 hover:bg-yellow-500/50 text-yellow-300' : 'bg-gray-500/30 hover:bg-gray-500/50 text-gray-600'} rounded transition-colors`}
               >
@@ -1235,11 +900,11 @@ export default function EnhancedMusicRequestApp() {
               <h3 className={`${currentTheme.text} font-bold text-sm`}>楽曲管理</h3>
               <div className="flex space-x-2">
                 <button
-                  onClick={exportToCSV}
-                  className="px-3 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm font-medium flex items-center space-x-1"
+                  onClick={() => setShowBulkAddModal(true)}
+                  className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium flex items-center space-x-1"
                 >
-                  <Download className="w-3 h-3" />
-                  <span>エクスポート</span>
+                  <Plus className="w-3 h-3" />
+                  <span>一括追加</span>
                 </button>
                 <button
                   onClick={publishSongs}
@@ -1260,6 +925,15 @@ export default function EnhancedMusicRequestApp() {
                 ✅ 楽曲リストが公開されました
               </div>
             )}
+            
+            {/* Firebase設定情報 */}
+            <div className="mt-3 p-2 bg-blue-500/20 border border-blue-500/30 rounded">
+              <div className="text-xs text-blue-200 space-y-1">
+                <div>📊 Firebase Project: {firebaseConfig.projectId}</div>
+                <div>🔗 Status: {firebaseConnected ? 'Connected' : 'Disconnected'}</div>
+                {lastSyncTime && <div>⏰ Last Sync: {lastSyncTime.toLocaleString()}</div>}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1291,24 +965,14 @@ export default function EnhancedMusicRequestApp() {
                   <option key={genre} value={genre}>{genre}</option>
                 ))}
               </select>
-              
-              <select
-                value={filterRating}
-                onChange={(e) => setFilterRating(Number(e.target.value))}
-                className={`px-2 py-1 ${currentTheme.inputBg} border rounded ${currentTheme.inputText} text-sm`}
-              >
-                <option value={0}>全評価</option>
-                <option value={4}>★4以上</option>
-                <option value={5}>★5のみ</option>
-              </select>
 
               {isAdmin && (
                 <button
-                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                  className={`px-2 py-1 rounded text-sm transition-colors ${showFavoritesOnly ? 'bg-red-500 text-white' : 'bg-gray-500/30 text-gray-400'}`}
+                  onClick={() => setShowSpecialtyOnly(!showSpecialtyOnly)}
+                  className={`px-2 py-1 rounded text-sm transition-colors ${showSpecialtyOnly ? 'bg-orange-500 text-white' : 'bg-gray-500/30 text-gray-400'}`}
                 >
-                  <Heart className="w-3 h-3 inline mr-1" />
-                  お気に入りのみ
+                  <Star className="w-3 h-3 inline mr-1" />
+                  得意のみ
                 </button>
               )}
             </div>
@@ -1322,7 +986,6 @@ export default function EnhancedMusicRequestApp() {
                 <option value="title">楽曲名順</option>
                 <option value="artist">アーティスト順</option>
                 <option value="copyCount">リクエスト数順</option>
-                <option value="rating">評価順</option>
                 <option value="createdAt">追加日順</option>
               </select>
               
@@ -1336,135 +999,112 @@ export default function EnhancedMusicRequestApp() {
           </div>
         </div>
 
-        {/* 楽曲リスト */}
+        {/* 楽曲リスト（テーブル表示のみ） */}
         <div className={`${currentTheme.card} rounded-lg border overflow-hidden`}>
-          {viewMode === 'table' ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className={`${isDarkMode ? 'bg-white/10' : 'bg-gray-50'}`}>
-                    {!isAdmin && <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>リクエスト</th>}
-                    <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>楽曲名</th>
-                    <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>アーティスト</th>
-                    <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>ジャンル/タグ</th>
-                    <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>評価</th>
-                    {isAdmin && <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>お気に入り</th>}
-                    {isAdmin && <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>管理</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSongs.map((song, index) => (
-                    <tr key={song.id} className={`border-t ${isDarkMode ? 'border-white/10' : 'border-gray-200'} ${currentTheme.cardHover} ${index % 2 === 0 ? currentTheme.cardEven : ''}`}>
-                      {!isAdmin && (
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col items-center space-y-2">
-                            <button
-                              onClick={() => copyToClipboard(song)}
-                              className={`flex items-center space-x-1 px-3 py-1 rounded text-xs ${copiedSong === song.id ? 'bg-green-500 text-white' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'}`}
-                            >
-                              {copiedSong === song.id ? (
-                                <>
-                                  <Check className="w-3 h-3" />
-                                  <span>済</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-3 h-3" />
-                                  <span>リクエスト</span>
-                                </>
-                              )}
-                            </button>
-                            {song.copyCount > 0 && (
-                              <div className={`${currentTheme.textTertiary} text-xs`}>
-                                {song.copyCount}回
-                              </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className={`${isDarkMode ? 'bg-white/10' : 'bg-gray-50'}`}>
+                  {!isAdmin && <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>リクエスト</th>}
+                  <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>楽曲名</th>
+                  <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>アーティスト</th>
+                  <th className={`px-4 py-3 text-left ${currentTheme.text} font-bold`}>ジャンル/タグ</th>
+                  {isAdmin && <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>得意</th>}
+                  {isAdmin && <th className={`px-4 py-3 text-center ${currentTheme.text} font-bold`}>管理</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSongs.map((song, index) => (
+                  <tr key={song.id} className={`border-t ${isDarkMode ? 'border-white/10' : 'border-gray-200'} ${currentTheme.cardHover} ${index % 2 === 0 ? currentTheme.cardEven : ''}`}>
+                    {!isAdmin && (
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col items-center space-y-2">
+                          <button
+                            onClick={() => copyToClipboard(song)}
+                            className={`flex items-center space-x-1 px-3 py-1 rounded text-xs ${copiedSong === song.id ? 'bg-green-500 text-white' : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'}`}
+                          >
+                            {copiedSong === song.id ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>済</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>リクエスト</span>
+                              </>
                             )}
-                          </div>
-                        </td>
+                          </button>
+                          {song.copyCount > 0 && (
+                            <div className={`${currentTheme.textTertiary} text-xs`}>
+                              {song.copyCount}回
+                            </div>
+                          )}
+                          {song.isSpecialty && (
+                            <div className="text-orange-400 text-xs">★得意</div>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                    <td className="px-4 py-3">
+                      <div className={`${currentTheme.text} font-medium`}>{song.title}</div>
+                      {song.memo && (
+                        <div className={`${currentTheme.textTertiary} text-xs mt-1`}>{song.memo}</div>
                       )}
-                      <td className="px-4 py-3">
-                        <div className={`${currentTheme.text} font-medium`}>{song.title}</div>
-                        {song.reading && (
-                          <div className={`${currentTheme.textTertiary} text-xs mt-1`}>{song.reading}</div>
-                        )}
-                        {(song.key || song.duration) && (
-                          <div className={`${currentTheme.textTertiary} text-xs mt-1 flex space-x-2`}>
-                            {song.key && <span>キー: {song.key}</span>}
-                            {song.duration && <span>時間: {song.duration}</span>}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className={`${currentTheme.textSecondary}`}>{song.artist}</div>
-                        {song.difficulty && (
-                          <div className={`${currentTheme.textTertiary} text-xs mt-1 flex items-center space-x-2`}>
-                            <span>難易度:</span>
-                            <DifficultyDisplay difficulty={song.difficulty} />
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className={`${currentTheme.textSecondary}`}>{song.artist}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {song.genre && (
                           <span className={`px-2 py-1 ${isDarkMode ? 'bg-purple-500/30 text-purple-200' : 'bg-purple-100 text-purple-800'} rounded text-xs`}>
                             {song.genre}
                           </span>
-                          {song.tags && song.tags.map((tag, index) => (
-                            <span key={index} className={`px-2 py-1 ${isDarkMode ? 'bg-blue-500/30 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded text-xs`}>
-                              {tag}
-                            </span>
-                          ))}
+                        )}
+                        {song.tags && song.tags.map((tag, index) => (
+                          <span key={index} className={`px-2 py-1 ${isDarkMode ? 'bg-blue-500/30 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded text-xs`}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => toggleSpecialty(song.id)}
+                          className={`p-1 rounded transition-colors ${song.isSpecialty ? 'text-orange-400' : 'text-gray-400'}`}
+                        >
+                          <Star className={`w-4 h-4 ${song.isSpecialty ? 'fill-current' : ''}`} />
+                        </button>
+                      </td>
+                    )}
+                    {isAdmin && (
+                      <td className="px-4 py-3">
+                        <div className="flex justify-center space-x-2">
+                          <button
+                            onClick={() => {
+                              setEditingSong(song);
+                              setShowEditModal(true);
+                            }}
+                            className="p-2 bg-blue-500/30 hover:bg-blue-500/50 rounded text-blue-300 transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(song)}
+                            className="p-2 bg-red-500/30 hover:bg-red-500/50 rounded text-red-300 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <StarRating 
-                          rating={song.rating || 0} 
-                          onRatingChange={isAdmin ? (rating) => updateRating(song.id, rating) : null}
-                          readOnly={!isAdmin}
-                        />
-                      </td>
-                      {isAdmin && (
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => toggleFavorite(song.id)}
-                            className={`p-1 rounded transition-colors ${song.isFavorite ? 'text-red-400' : 'text-gray-400'}`}
-                          >
-                            <Heart className={`w-4 h-4 ${song.isFavorite ? 'fill-current' : ''}`} />
-                          </button>
-                        </td>
-                      )}
-                      {isAdmin && (
-                        <td className="px-4 py-3">
-                          <div className="flex justify-center space-x-2">
-                            <button
-                              onClick={() => {
-                                setEditingSong(song);
-                                setShowEditModal(true);
-                              }}
-                              className="p-2 bg-blue-500/30 hover:bg-blue-500/50 rounded text-blue-300 transition-colors"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirm(song)}
-                              className="p-2 bg-red-500/30 hover:bg-red-500/50 rounded text-red-300 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-              {filteredSongs.map((song) => (
-                <SongCard key={song.id} song={song} />
-              ))}
-            </div>
-          )}
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {filteredSongs.length === 0 && (
             <div className={`text-center py-8 ${currentTheme.textTertiary}`}>
@@ -1551,4 +1191,241 @@ export default function EnhancedMusicRequestApp() {
             <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md max-h-[80vh] overflow-y-auto">
               <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲追加</h3>
               
-              <div className
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
+                  <input
+                    type="text"
+                    value={newSong.title}
+                    onChange={(e) => setNewSong({...newSong, title: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="楽曲名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
+                  <input
+                    type="text"
+                    value={newSong.reading || ''}
+                    onChange={(e) => setNewSong({...newSong, reading: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="よみがなを入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
+                  <input
+                    type="text"
+                    value={newSong.artist}
+                    onChange={(e) => setNewSong({...newSong, artist: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="アーティスト名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
+                  <select
+                    value={newSong.genre}
+                    onChange={(e) => setNewSong({...newSong, genre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">ジャンルを選択</option>
+                    {availableGenres.map(genre => (
+                      <option key={genre} value={genre}>{genre}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
+                  <input
+                    type="text"
+                    value={Array.isArray(newSong.tags) ? newSong.tags.join(', ') : ''}
+                    onChange={(e) => setNewSong({...newSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="タグをカンマ区切りで入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                  <textarea
+                    value={newSong.memo || ''}
+                    onChange={(e) => setNewSong({...newSong, memo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="メモを入力"
+                    rows="2"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={addSong}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                  disabled={!newSong.title || !newSong.artist}
+                >
+                  追加
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 一括追加モーダル */}
+        {showBulkAddModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md max-h-[80vh] overflow-y-auto">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲一括追加</h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲リスト</label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    1行に1曲ずつ入力してください。<br/>
+                    形式: "楽曲名 - アーティスト名" または "楽曲名,アーティスト名"
+                  </p>
+                  <textarea
+                    value={bulkSongText}
+                    onChange={(e) => setBulkSongText(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="例:&#10;紅蓮華 - LiSA&#10;夜に駆ける - YOASOBI&#10;Pretender - Official髭男dism"
+                    rows="10"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={addBulkSongs}
+                  className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium"
+                  disabled={!bulkSongText.trim()}
+                >
+                  一括追加
+                </button>
+                <button
+                  onClick={() => setShowBulkAddModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* メッセージ編集モーダル */}
+        {showMessageEditModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">メッセージ編集</h3>
+              
+              <textarea
+                value={tempAdminMessage}
+                onChange={(e) => setTempAdminMessage(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder="配信者からのメッセージを入力"
+                rows="4"
+              />
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={() => {
+                    saveAdminMessageToStorage(tempAdminMessage);
+                    setShowMessageEditModal(false);
+                  }}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                >
+                  保存
+                </button>
+                <button
+                  onClick={() => setShowMessageEditModal(false)}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 楽曲編集モーダル */}
+        {showEditModal && editingSong && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg p-4 w-full max-w-md max-h-[80vh] overflow-y-auto">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">楽曲編集</h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">楽曲名 *</label>
+                  <input
+                    type="text"
+                    value={editingSong.title}
+                    onChange={(e) => setEditingSong({...editingSong, title: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="楽曲名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
+                  <input
+                    type="text"
+                    value={editingSong.reading || ''}
+                    onChange={(e) => setEditingSong({...editingSong, reading: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="よみがなを入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
+                  <input
+                    type="text"
+                    value={editingSong.artist}
+                    onChange={(e) => setEditingSong({...editingSong, artist: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="アーティスト名を入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ジャンル</label>
+                  <select
+                    value={editingSong.genre}
+                    onChange={(e) => setEditingSong({...editingSong, genre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">ジャンルを選択</option>
+                    {availableGenres.map(genre => (
+                      <option key={genre} value={genre}>{genre}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
+                  <input
+                    type="text"
+                    value={Array.isArray(editingSong.tags) ? editingSong.tags.join(', ') : ''}
+                    onChange={(e) => setEditingSong({...editingSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="タグをカンマ区切りで入力"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                  <textarea
+                    value={editingSong.memo || ''}
+                    onChange={(e) => setEditingSong({...editingSong, memo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
