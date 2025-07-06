@@ -105,7 +105,7 @@ export default function EnhancedMusicRequestApp() {
     memo: ''
   });
   const [bulkSongText, setBulkSongText] = useState('');
-  const [availableGenres] = useState(['J-POP', 'アニソン', 'ロック', 'バラード', '演歌', 'クラシック', 'ボカロ', 'インスト']);
+  const [availableGenres] = useState(['J-POP', 'アニソン', 'ロック', 'バラード', '演歌', 'クラシック', 'ボカロ', '洋楽']);
 
   // テーマ設定
   const currentTheme = isDarkMode ? {
