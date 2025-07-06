@@ -522,14 +522,16 @@ export default function EnhancedMusicRequestApp() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {/* 統計ボタン */}
-              <button
-                onClick={() => setShowStatsModal(true)}
-                className={`p-2 ${isDarkMode ? 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-300' : 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-600'} rounded transition-colors`}
-                title="統計を表示"
-              >
-                <BarChart3 className="w-4 h-4" />
-              </button>
+              {/* 統計ボタン（管理者のみ） */}
+              {isAdmin && (
+                <button
+                  onClick={() => setShowStatsModal(true)}
+                  className={`p-2 ${isDarkMode ? 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-300' : 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-600'} rounded transition-colors`}
+                  title="統計を表示"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                </button>
+              )}
 
               <button
                 onClick={() => {
@@ -580,7 +582,8 @@ export default function EnhancedMusicRequestApp() {
             <div className="flex items-center space-x-2 mb-2">
               <Copy className={`w-4 h-4 ${currentTheme.icon}`} />
               <p className={`${currentTheme.textSecondary} text-xs`}>
-                楽曲の「リクエスト」ボタンを押すとクリップボードにコピーされます！
+                楽曲の「リクエスト」ボタンを押すとクリップボードにコピーされます！<br/>
+                コピーした楽曲名をコメント欄に貼り付けてリクエストしてください♪
               </p>
             </div>
             {topSongs.length > 0 && (
@@ -723,7 +726,7 @@ export default function EnhancedMusicRequestApp() {
                             {copiedSong === song.id ? (
                               <>
                                 <Check className="w-3 h-3" />
-                                <span>済</span>
+                                <span>コピーしました</span>
                               </>
                             ) : (
                               <>
@@ -811,8 +814,8 @@ export default function EnhancedMusicRequestApp() {
           )}
         </div>
 
-        {/* 統計モーダル */}
-        {showStatsModal && <StatsModal />}
+        {/* 統計モーダル（管理者のみ） */}
+        {showStatsModal && isAdmin && <StatsModal />}
 
         {/* パスワードモーダル */}
         {showPasswordModal && (
@@ -978,13 +981,13 @@ export default function EnhancedMusicRequestApp() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">楽曲リスト</label>
                   <p className="text-xs text-gray-500 mb-2">
                     1行に1曲ずつ入力してください。<br/>
-                    形式: "楽曲名 - アーティスト名" または "楽曲名,アーティスト名"
+                    形式: "楽曲名,アーティスト名"
                   </p>
                   <textarea
                     value={bulkSongText}
                     onChange={(e) => setBulkSongText(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="例:&#10;紅蓮華 - LiSA&#10;夜に駆ける - YOASOBI&#10;Pretender - Official髭男dism"
+                    placeholder="例:&#10;紅蓮華,LiSA&#10;夜に駆ける,YOASOBI&#10;Pretender,Official髭男dism"
                     rows="10"
                   />
                 </div>
