@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff, Star, BarChart3, Filter, SortAsc, SortDesc, Plus } from 'lucide-react';
+import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Star, Filter, SortAsc, SortDesc, Plus } from 'lucide-react';
 
 // Firebase設定
 const firebaseConfig = {
@@ -77,16 +77,15 @@ export default function EnhancedMusicRequestApp() {
   const [databaseConnected, setDatabaseConnected] = useState(false);
   const [loadingFirebase, setLoadingFirebase] = useState(true);
   const [showPublishMessage, setShowPublishMessage] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState(null);
 
   // 表示・フィルター機能
   const [sortBy, setSortBy] = useState('title');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterGenre, setFilterGenre] = useState('');
   const [showSpecialtyOnly, setShowSpecialtyOnly] = useState(false);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
 
   // モーダル表示状態
-  const [showStatsModal, setShowStatsModal] = useState(false);
   const [showBulkAddModal, setShowBulkAddModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -104,8 +103,8 @@ export default function EnhancedMusicRequestApp() {
       memo: '', 
       copyCount: 2,
       isSpecialty: false,
-      createdAt: new Date('2024-01-15'),
-      lastRequested: new Date('2024-06-20')
+      createdAt: new Date('2024-01-15').toISOString(),
+      lastRequested: new Date('2024-06-20').toISOString()
     },
     { 
       id: 2, 
@@ -117,8 +116,8 @@ export default function EnhancedMusicRequestApp() {
       memo: '', 
       copyCount: 5,
       isSpecialty: true,
-      createdAt: new Date('2024-01-20'),
-      lastRequested: new Date('2024-06-25')
+      createdAt: new Date('2024-01-20').toISOString(),
+      lastRequested: new Date('2024-06-25').toISOString()
     },
     { 
       id: 3, 
@@ -130,12 +129,12 @@ export default function EnhancedMusicRequestApp() {
       memo: '人気曲', 
       copyCount: 15,
       isSpecialty: true,
-      createdAt: new Date('2024-02-10'),
-      lastRequested: new Date('2024-06-27')
+      createdAt: new Date('2024-02-10').toISOString(),
+      lastRequested: new Date('2024-06-27').toISOString()
     }
   ];
 
-  // Firebaseストレージ操作関数（ローカルストレージ不使用）
+  // Firebaseストレージ操作関数
   const saveToFirestore = async (collection, data) => {
     try {
       if (!db) {
@@ -145,15 +144,13 @@ export default function EnhancedMusicRequestApp() {
       
       console.log(`Saving to Firestore collection: ${collection}`, data);
       
-      // Firestoreに保存
       await db.collection('musicApp').doc(collection).set({
         data: data,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
         version: 1
       });
       
-      console.log(`[Firestore] Data saved to ${collection}:`, data);
-      
+      console.log(`[Firestore] Data saved to ${collection}`);
       return { success: true, source: 'firestore' };
     } catch (error) {
       console.error('Firestore save error:', error);
@@ -170,16 +167,14 @@ export default function EnhancedMusicRequestApp() {
       
       console.log(`Loading from Firestore collection: ${collection}`);
       
-      // Firestoreから読み込み
       const doc = await db.collection('musicApp').doc(collection).get();
       
       if (doc.exists) {
         const firestoreData = doc.data().data;
-        console.log(`[Firestore] Data loaded from ${collection}:`, firestoreData);
+        console.log(`[Firestore] Data loaded from ${collection}`);
         return firestoreData;
       } else {
-        console.log(`No data found in Firestore for ${collection}, using default`);
-        // デフォルト値をFirestoreに保存
+        console.log(`No data found in Firestore for ${collection}, saving default`);
         await saveToFirestore(collection, defaultValue);
         return defaultValue;
       }
@@ -236,100 +231,88 @@ export default function EnhancedMusicRequestApp() {
     inputFocus: 'focus:ring-purple-500'
   };
 
-  // データをFirestoreに保存するヘルパー関数（強化版）
+  // データをFirestoreに保存するヘルパー関数
   const saveSongsToStorage = async (songsData) => {
+    console.log('Saving songs:', songsData);
+    // 即座にstateを更新
+    setSongs([...songsData]);
+    
+    // Firestoreに保存は別途実行（失敗してもstateは更新済み）
     try {
-      console.log('Saving songs data:', songsData);
       const result = await saveToFirestore('songs', songsData);
-      
       if (result.success) {
-        setSongs(songsData);
-        setFirebaseConnected(true);
-        setDatabaseConnected(true);
-        setLastSyncTime(new Date());
-        console.log('Songs successfully saved and state updated');
+        console.log('Songs saved to Firestore successfully');
       } else {
         console.error('Failed to save songs to Firestore');
-        setFirebaseConnected(false);
       }
-      
-      return result;
     } catch (error) {
       console.error('Error saving songs:', error);
-      setFirebaseConnected(false);
-      return { success: false, error };
     }
+    
+    return { success: true };
   };
 
   const savePublishedSongsToStorage = async (publishedData) => {
-    try {
-      console.log('Saving published songs data:', publishedData);
-      const result = await saveToFirestore('publishedSongs', publishedData);
-      
-      if (result.success) {
-        setPublishedSongs(publishedData);
-        setFirebaseConnected(true);
-        setDatabaseConnected(true);
-        setLastSyncTime(new Date());
-        console.log('Published songs successfully saved and state updated');
-      } else {
-        console.error('Failed to save published songs to Firestore');
-        setFirebaseConnected(false);
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Error saving published songs:', error);
-      setFirebaseConnected(false);
-      return { success: false, error };
+    console.log('Saving published songs:', publishedData);
+    const result = await saveToFirestore('publishedSongs', publishedData);
+    if (result.success) {
+      setPublishedSongs([...publishedData]);
+      console.log('Published songs saved successfully');
+    } else {
+      console.error('Failed to save published songs');
     }
+    return result;
   };
 
   const saveAdminMessageToStorage = async (message) => {
+    console.log('Saving admin message:', message);
+    // 即座にstateを更新
+    setAdminMessage(message);
+    
+    // Firestoreに保存は別途実行（失敗してもstateは更新済み）
     try {
-      console.log('Saving admin message:', message);
       const result = await saveToFirestore('adminMessage', message);
-      
       if (result.success) {
-        setAdminMessage(message);
-        setFirebaseConnected(true);
-        setDatabaseConnected(true);
-        setLastSyncTime(new Date());
-        console.log('Admin message successfully saved');
+        console.log('Admin message saved to Firestore successfully');
       } else {
         console.error('Failed to save admin message to Firestore');
-        setFirebaseConnected(false);
       }
-      
-      return result;
     } catch (error) {
       console.error('Error saving admin message:', error);
-      setFirebaseConnected(false);
-      return { success: false, error };
     }
+    
+    return { success: true };
   };
 
-  // 楽曲編集の保存処理を強化
-  const updateSong = async (updatedSong) => {
+  const saveDarkModeToStorage = async (darkMode) => {
+    console.log('Saving dark mode:', darkMode);
+    // 即座にstateを更新
+    setIsDarkMode(darkMode);
+    
+    // Firestoreに保存は別途実行（失敗してもstateは更新済み）
     try {
-      console.log('Updating song:', updatedSong);
-      const updatedSongs = songs.map(song => 
-        song.id === updatedSong.id ? {...song, ...updatedSong, updatedAt: new Date()} : song
-      );
-      
-      const result = await saveSongsToStorage(updatedSongs);
-      
+      const result = await saveToFirestore('isDarkMode', darkMode);
       if (result.success) {
-        console.log('Song successfully updated');
-        return true;
+        console.log('Dark mode saved to Firestore successfully');
       } else {
-        console.error('Failed to update song');
-        return false;
+        console.error('Failed to save dark mode to Firestore');
       }
     } catch (error) {
-      console.error('Error updating song:', error);
-      return false;
+      console.error('Error saving dark mode:', error);
     }
+    
+    return { success: true };
+  };
+
+  // 楽曲編集の保存処理
+  const updateSong = async (updatedSong) => {
+    console.log('Updating song:', updatedSong);
+    const updatedSongs = songs.map(song => 
+      song.id === updatedSong.id ? {...updatedSong, updatedAt: new Date().toISOString()} : song
+    );
+    
+    const result = await saveSongsToStorage(updatedSongs);
+    return result.success;
   };
 
   // 初期化
@@ -359,10 +342,6 @@ export default function EnhancedMusicRequestApp() {
         setPublishedSongs(loadedPublished);
         setAdminMessage(loadedMessage);
         setIsDarkMode(loadedDarkMode);
-
-        if (firebaseInitialized) {
-          setLastSyncTime(new Date());
-        }
       } catch (error) {
         console.error('Initialization error:', error);
         setFirebaseConnected(false);
@@ -378,9 +357,8 @@ export default function EnhancedMusicRequestApp() {
     init();
   }, []);
 
-  // 計算プロパティ
+  // 計算プロパティ（シンプル版）
   const displayedSongs = isAdmin ? songs : publishedSongs;
-  const topSongs = displayedSongs.filter(song => song.copyCount > 0).sort((a, b) => b.copyCount - a.copyCount).slice(0, 3);
   
   // 検索・フィルター・ソート機能
   const getFilteredAndSortedSongs = () => {
@@ -435,57 +413,66 @@ export default function EnhancedMusicRequestApp() {
   };
 
   const filteredSongs = getFilteredAndSortedSongs();
-
-  // 統計データ計算
-  const getStatistics = () => {
-    const total = displayedSongs.length;
-    const totalRequests = displayedSongs.reduce((sum, song) => sum + (song.copyCount || 0), 0);
-    const specialtyCount = displayedSongs.filter(song => song.isSpecialty).length;
+  
+  // 検索候補を取得する関数
+  const getSearchSuggestions = () => {
+    if (searchTerm.length < 1) return [];
     
-    const genreStats = {};
+    const searchLower = searchTerm.toLowerCase();
+    const suggestions = new Set();
+    
     displayedSongs.forEach(song => {
-      genreStats[song.genre] = (genreStats[song.genre] || 0) + 1;
+      // 楽曲名候補
+      if (song.title.toLowerCase().includes(searchLower)) {
+        suggestions.add(song.title);
+      }
+      
+      // アーティスト名候補
+      if (song.artist.toLowerCase().includes(searchLower)) {
+        suggestions.add(song.artist);
+      }
+      
+      // 読み仮名候補
+      if (song.reading && song.reading.toLowerCase().includes(searchLower)) {
+        suggestions.add(song.reading);
+      }
+      
+      // ジャンル候補
+      if (song.genre && song.genre.toLowerCase().includes(searchLower)) {
+        suggestions.add(song.genre);
+      }
+      
+      // タグ候補
+      if (song.tags) {
+        song.tags.forEach(tag => {
+          if (tag.toLowerCase().includes(searchLower)) {
+            suggestions.add(tag);
+          }
+        });
+      }
     });
-
-    return {
-      total,
-      totalRequests,
-      specialtyCount,
-      genreStats
-    };
+    
+    return Array.from(suggestions).slice(0, 5); // 最大5件の候補
   };
+  
+  const searchSuggestions = getSearchSuggestions();
 
-  // イベントハンドラー
+  // リクエスト機能（シンプル版）
   const copyToClipboard = async (song) => {
     const requestText = `♪ ${song.title} - ${song.artist}`;
     try {
       await navigator.clipboard.writeText(requestText);
       setCopiedSong(song.id);
-      
-      if (isAdmin) {
-        const updatedSongs = songs.map(s => s.id === song.id ? {
-          ...s, 
-          copyCount: (s.copyCount || 0) + 1,
-          lastRequested: new Date()
-        } : s);
-        await saveSongsToStorage(updatedSongs);
-      } else {
-        const updatedPublished = publishedSongs.map(s => s.id === song.id ? {
-          ...s, 
-          copyCount: (s.copyCount || 0) + 1,
-          lastRequested: new Date()
-        } : s);
-        await savePublishedSongsToStorage(updatedPublished);
-      }
-      
       setTimeout(() => setCopiedSong(null), 2000);
     } catch (err) {
+      console.error('Clipboard error:', err);
       setCopiedSong(song.id);
       setTimeout(() => setCopiedSong(null), 2000);
     }
   };
 
   const toggleSpecialty = async (songId) => {
+    console.log('Toggling specialty for song:', songId);
     const updatedSongs = songs.map(song => 
       song.id === songId ? { ...song, isSpecialty: !song.isSpecialty } : song
     );
@@ -513,6 +500,7 @@ export default function EnhancedMusicRequestApp() {
   };
 
   const deleteSong = async (songToDelete) => {
+    console.log('Deleting song:', songToDelete.id);
     const updatedSongs = songs.filter(song => song.id !== songToDelete.id);
     await saveSongsToStorage(updatedSongs);
     setDeleteConfirm(null);
@@ -522,6 +510,7 @@ export default function EnhancedMusicRequestApp() {
     if (!newSong.title || !newSong.artist) return;
     
     try {
+      console.log('Adding new song:', newSong);
       const id = Math.max(...songs.map(s => s.id), 0) + 1;
       const songToAdd = { 
         ...newSong, 
@@ -529,12 +518,21 @@ export default function EnhancedMusicRequestApp() {
         copyCount: 0, 
         tags: newSong.tags || [],
         isSpecialty: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
-      const updatedSongs = [...songs, songToAdd];
-      await saveSongsToStorage(updatedSongs);
+      console.log('Song to add:', songToAdd);
       
+      const updatedSongs = [...songs, songToAdd];
+      console.log('Updated songs array:', updatedSongs);
+      
+      // 即座にstateを更新
+      setSongs(updatedSongs);
+      
+      // Firestoreに保存（バックグラウンド）
+      await saveToFirestore('songs', updatedSongs);
+      
+      // フォームをリセット
       setNewSong({ 
         title: '', 
         artist: '', 
@@ -544,6 +542,7 @@ export default function EnhancedMusicRequestApp() {
         memo: ''
       });
       setShowAddModal(false);
+      console.log('Song added successfully');
     } catch (error) {
       console.error('Error adding song:', error);
     }
@@ -553,6 +552,7 @@ export default function EnhancedMusicRequestApp() {
     if (!bulkSongText.trim()) return;
     
     try {
+      console.log('Adding bulk songs from text:', bulkSongText);
       const lines = bulkSongText.trim().split('\n');
       const newSongs = [];
       let maxId = Math.max(...songs.map(s => s.id), 0);
@@ -583,17 +583,26 @@ export default function EnhancedMusicRequestApp() {
             memo: '',
             copyCount: 0,
             isSpecialty: false,
-            createdAt: new Date(),
-            updatedAt: new Date()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           });
         }
       });
       
       if (newSongs.length > 0) {
+        console.log('New songs to add:', newSongs);
         const updatedSongs = [...songs, ...newSongs];
-        await saveSongsToStorage(updatedSongs);
+        console.log('Updated songs array:', updatedSongs);
+        
+        // 即座にstateを更新
+        setSongs(updatedSongs);
+        
+        // Firestoreに保存（バックグラウンド）
+        await saveToFirestore('songs', updatedSongs);
+        
         setBulkSongText('');
         setShowBulkAddModal(false);
+        console.log(`${newSongs.length} songs added successfully`);
       }
     } catch (error) {
       console.error('Error adding bulk songs:', error);
@@ -601,69 +610,29 @@ export default function EnhancedMusicRequestApp() {
   };
 
   const publishSongs = async () => {
-    await savePublishedSongsToStorage([...songs]);
-    setLastSyncTime(new Date());
+    console.log('Publishing songs...');
+    console.log('Current songs to publish:', songs);
+    
+    // 即座にstateを更新
+    setPublishedSongs([...songs]);
+    
+    // 公開メッセージを表示
     setShowPublishMessage(true);
     setTimeout(() => setShowPublishMessage(false), 3000);
-  };
-
-  // 統計モーダル
-  const StatsModal = () => {
-    const stats = getStatistics();
     
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white/95 backdrop-blur-md rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-800 flex items-center">
-              <BarChart3 className="w-6 h-6 mr-2 text-purple-600" />
-              楽曲統計
-            </h3>
-            <button
-              onClick={() => setShowStatsModal(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-blue-50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-              <div className="text-sm text-blue-800">総楽曲数</div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.totalRequests}</div>
-              <div className="text-sm text-green-800">総リクエスト数</div>
-            </div>
-            <div className="bg-orange-50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-orange-600">{stats.specialtyCount}</div>
-              <div className="text-sm text-orange-800">得意楽曲数</div>
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <h4 className="text-lg font-bold text-gray-800 mb-3">ジャンル別分布</h4>
-            <div className="space-y-2">
-              {Object.entries(stats.genreStats).map(([genre, count]) => (
-                <div key={genre} className="flex items-center justify-between">
-                  <span className="text-gray-700">{genre}</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-purple-500 h-2 rounded-full" 
-                        style={{width: `${(count / stats.total) * 100}%`}}
-                      />
-                    </div>
-                    <span className="text-sm text-gray-600 w-8">{count}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    // Firestoreに保存（バックグラウンド）
+    try {
+      const result = await saveToFirestore('publishedSongs', songs);
+      if (result.success) {
+        console.log('Published songs saved to Firestore successfully');
+      } else {
+        console.error('Failed to save published songs to Firestore');
+      }
+    } catch (error) {
+      console.error('Error saving published songs:', error);
+    }
+    
+    console.log('Songs published successfully');
   };
 
   if (loadingFirebase) {
@@ -692,36 +661,11 @@ export default function EnhancedMusicRequestApp() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {/* Firebase接続状態 */}
-              <div className="flex items-center space-x-1">
-                {firebaseConnected ? (
-                  <Wifi className="w-4 h-4 text-green-400" title="Firebase接続済み" />
-                ) : (
-                  <WifiOff className="w-4 h-4 text-red-400" title="Firebase未接続" />
-                )}
-                {databaseConnected ? (
-                  <Database className="w-4 h-4 text-green-400" title="データベース接続済み" />
-                ) : (
-                  <Database className="w-4 h-4 text-red-400" title="データベース未接続" />
-                )}
-                {lastSyncTime && (
-                  <span className={`text-xs ${currentTheme.textTertiary}`}>
-                    {lastSyncTime.toLocaleTimeString()}
-                  </span>
-                )}
-              </div>
-
-              <button
-                onClick={() => setShowStatsModal(true)}
-                className={`p-2 ${isDarkMode ? 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-300' : 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-600'} rounded transition-colors`}
-                title="統計を表示"
-              >
-                <BarChart3 className="w-4 h-4" />
-              </button>
-
               <button
                 onClick={() => {
-                  saveDarkModeToStorage(!isDarkMode);
+                  const newDarkMode = !isDarkMode;
+                  setIsDarkMode(newDarkMode);
+                  saveDarkModeToStorage(newDarkMode);
                 }}
                 className={`p-2 ${isDarkMode ? 'bg-yellow-500/30 hover:bg-yellow-500/50 text-yellow-300' : 'bg-gray-500/30 hover:bg-gray-500/50 text-gray-600'} rounded transition-colors`}
               >
@@ -740,12 +684,14 @@ export default function EnhancedMusicRequestApp() {
         </div>
 
         {/* 配信者メッセージ */}
-        <div className={`${currentTheme.card} rounded-lg p-3 mb-3 border`}>
-          <div className="flex items-start space-x-2">
-            <MessageSquare className={`w-4 h-4 ${currentTheme.icon} mt-0.5`} />
+        <div className={`${isDarkMode ? 'bg-yellow-500/20 border-yellow-400/50' : 'bg-yellow-50 border-yellow-300'} rounded-lg p-4 mb-3 border-2`}>
+          <div className="flex items-start space-x-3">
+            <MessageSquare className={`w-5 h-5 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-600'} mt-0.5`} />
             <div className="flex-1">
-              <h3 className={`text-sm font-bold ${currentTheme.text} mb-1`}>配信者からのメッセージ</h3>
-              <p className={`${currentTheme.textSecondary} text-sm`}>{adminMessage}</p>
+              <h3 className={`text-sm font-bold ${isDarkMode ? 'text-yellow-200' : 'text-yellow-800'} mb-2`}>
+                📢 配信者からのメッセージ
+              </h3>
+              <p className={`${isDarkMode ? 'text-yellow-100' : 'text-yellow-700'} text-sm`}>{adminMessage}</p>
             </div>
             {isAdmin && (
               <button
@@ -753,36 +699,27 @@ export default function EnhancedMusicRequestApp() {
                   setTempAdminMessage(adminMessage);
                   setShowMessageEditModal(true);
                 }}
-                className="p-1 bg-blue-500/30 hover:bg-blue-500/50 rounded text-blue-300 transition-colors"
+                className={`p-2 ${isDarkMode ? 'bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-200' : 'bg-yellow-200 hover:bg-yellow-300 text-yellow-700'} rounded transition-colors`}
               >
-                <Edit className="w-3 h-3" />
+                <Edit className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
 
-        {/* ゲスト向け説明・TOP3 */}
+        {/* ゲスト向け説明 */}
         {!isAdmin && (
           <div className={`${isDarkMode ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-md border-purple-300/30' : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-200'} rounded-lg p-3 mb-3 border`}>
             <div className="flex items-center space-x-2 mb-2">
               <Copy className={`w-4 h-4 ${currentTheme.icon}`} />
-              <p className={`${currentTheme.textSecondary} text-xs`}>
-                楽曲の「リクエスト」ボタンを押すとクリップボードにコピーされます！
-              </p>
-            </div>
-            {topSongs.length > 0 && (
-              <div className={`mt-2 pt-2 border-t ${isDarkMode ? 'border-white/20' : 'border-gray-200'}`}>
-                <p className={`${currentTheme.text} text-xs font-bold mb-1`}>🏆 人気楽曲 TOP3</p>
-                <div className="space-y-1">
-                  {topSongs.map((song, index) => (
-                    <div key={song.id} className={`${currentTheme.textSecondary} text-xs flex items-center justify-between`}>
-                      <span>{index + 1}. {song.title} - {song.artist}</span>
-                      <span className={`${currentTheme.icon} text-xs`}>{song.copyCount}回</span>
-                    </div>
-                  ))}
-                </div>
+              <div className={`${currentTheme.textSecondary} text-sm`}>
+                <p className="font-medium mb-1">🎵 リクエスト方法</p>
+                <p className="text-xs">
+                  楽曲の「リクエスト」ボタンを押すと、楽曲名とアーティスト名がクリップボードにコピーされます。<br/>
+                  コピーした内容をチャット欄やコメント欄に貼り付けてリクエストしてください！
+                </p>
               </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -815,24 +752,9 @@ export default function EnhancedMusicRequestApp() {
             </div>
             {showPublishMessage && (
               <div className="mt-3 p-2 bg-green-500/20 border border-green-500/30 rounded text-green-300 text-sm text-center">
-                ✅ 楽曲リストが公開されました
+                ✅ 楽曲リストが公開されました！ゲストに楽曲が表示されています。
               </div>
             )}
-            
-            {/* Firebase設定情報 */}
-            <div className="mt-3 p-2 bg-blue-500/20 border border-blue-500/30 rounded">
-              <div className="text-xs text-blue-200 space-y-1">
-                <div>📊 Firebase Project: {firebaseConfig.projectId}</div>
-                <div>🔗 Status: {firebaseConnected ? 'Connected' : 'Disconnected'}</div>
-                <div>💾 Storage: Firestore Only (No LocalStorage)</div>
-                {lastSyncTime && <div>⏰ Last Sync: {lastSyncTime.toLocaleString()}</div>}
-                {!firebaseConnected && (
-                  <div className="text-red-300 text-xs mt-2">
-                    ⚠️ Firebase未接続のため、データは保存されません
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
@@ -882,7 +804,6 @@ export default function EnhancedMusicRequestApp() {
               >
                 <option value="title">楽曲名順</option>
                 <option value="artist">アーティスト順</option>
-                <option value="copyCount">リクエスト数順</option>
                 <option value="createdAt">追加日順</option>
               </select>
               
@@ -923,7 +844,7 @@ export default function EnhancedMusicRequestApp() {
                             {copiedSong === song.id ? (
                               <>
                                 <Check className="w-3 h-3" />
-                                <span>済</span>
+                                <span>コピーしました</span>
                               </>
                             ) : (
                               <>
@@ -932,11 +853,6 @@ export default function EnhancedMusicRequestApp() {
                               </>
                             )}
                           </button>
-                          {song.copyCount > 0 && (
-                            <div className={`${currentTheme.textTertiary} text-xs`}>
-                              {song.copyCount}回
-                            </div>
-                          )}
                           {song.isSpecialty && (
                             <div className="text-orange-400 text-xs">★得意</div>
                           )}
@@ -1012,7 +928,6 @@ export default function EnhancedMusicRequestApp() {
         </div>
 
         {/* モーダル類 */}
-        {showStatsModal && <StatsModal />}
 
         {/* パスワードモーダル */}
         {showPasswordModal && (
@@ -1101,6 +1016,17 @@ export default function EnhancedMusicRequestApp() {
                 </div>
                 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
+                  <input
+                    type="text"
+                    value={newSong.reading || ''}
+                    onChange={(e) => setNewSong({...newSong, reading: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="よみがなを入力"
+                  />
+                </div>
+                
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
                   <input
                     type="text"
@@ -1123,6 +1049,17 @@ export default function EnhancedMusicRequestApp() {
                       <option key={genre} value={genre}>{genre}</option>
                     ))}
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
+                  <input
+                    type="text"
+                    value={Array.isArray(newSong.tags) ? newSong.tags.join(', ') : ''}
+                    onChange={(e) => setNewSong({...newSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="タグをカンマ区切りで入力"
+                  />
                 </div>
                 
                 <div>
@@ -1215,6 +1152,8 @@ export default function EnhancedMusicRequestApp() {
               <div className="flex space-x-2 mt-4">
                 <button
                   onClick={() => {
+                    console.log('Saving message:', tempAdminMessage);
+                    setAdminMessage(tempAdminMessage);
                     saveAdminMessageToStorage(tempAdminMessage);
                     setShowMessageEditModal(false);
                   }}
@@ -1252,6 +1191,17 @@ export default function EnhancedMusicRequestApp() {
                 </div>
                 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
+                  <input
+                    type="text"
+                    value={editingSong.reading || ''}
+                    onChange={(e) => setEditingSong({...editingSong, reading: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="よみがなを入力"
+                  />
+                </div>
+                
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
                   <input
                     type="text"
@@ -1274,6 +1224,17 @@ export default function EnhancedMusicRequestApp() {
                       <option key={genre} value={genre}>{genre}</option>
                     ))}
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
+                  <input
+                    type="text"
+                    value={Array.isArray(editingSong.tags) ? editingSong.tags.join(', ') : ''}
+                    onChange={(e) => setEditingSong({...editingSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="タグをカンマ区切りで入力"
+                  />
                 </div>
                 
                 <div>
@@ -1302,7 +1263,6 @@ export default function EnhancedMusicRequestApp() {
                       console.log('Song edit completed successfully');
                     } else {
                       console.error('Failed to save song edits');
-                      // ここでエラーメッセージを表示することもできます
                     }
                   }}
                   className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
