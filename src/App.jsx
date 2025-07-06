@@ -893,8 +893,6 @@ export default function EnhancedMusicRequestApp() {
           )}
         </div>
 
-        {/* モーダル類 */}
-
         {/* パスワードモーダル */}
         {showPasswordModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
