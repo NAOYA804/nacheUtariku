@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff, Star, StarOff, BarChart3, Download, Upload, Filter, SortAsc, SortDesc, Heart, Clock, TrendingUp, PieChart, Calendar, Users, Plus } from 'lucide-react';
+import { Music, Search, Edit, Trash2, Copy, MessageSquare, Check, Sun, Moon, Database, Wifi, WifiOff, Star, BarChart3, Filter, SortAsc, SortDesc, Plus } from 'lucide-react';
 
 // Firebase設定
 const firebaseConfig = {
@@ -23,17 +23,14 @@ const loadFirebaseSDK = () => {
       return;
     }
 
-    // 既に読み込み済みの場合
     if (window.firebase) {
       resolve(window.firebase);
       return;
     }
 
-    // Firebase App SDKを読み込み
     const appScript = document.createElement('script');
     appScript.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
     appScript.onload = () => {
-      // Firebase Firestore SDKを読み込み
       const firestoreScript = document.createElement('script');
       firestoreScript.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';
       firestoreScript.onload = () => {
@@ -51,7 +48,7 @@ const loadFirebaseSDK = () => {
 const initializeFirebase = async () => {
   try {
     if (firebaseApp) {
-      return true; // 既に初期化済み
+      return true;
     }
 
     console.log('Loading Firebase SDK...');
@@ -69,9 +66,8 @@ const initializeFirebase = async () => {
   }
 };
 
-// 🎵 Firebase対応の楽曲管理システム
 export default function EnhancedMusicRequestApp() {
-  // 状態管理（重複なし）
+  // 状態管理
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState('');
@@ -84,20 +80,19 @@ export default function EnhancedMusicRequestApp() {
   const [lastSyncTime, setLastSyncTime] = useState(null);
 
   // 表示・フィルター機能
-  const [sortBy, setSortBy] = useState('title'); // 'title' | 'artist' | 'copyCount' | 'createdAt'
-  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc'
+  const [sortBy, setSortBy] = useState('title');
+  const [sortOrder, setSortOrder] = useState('asc');
   const [filterGenre, setFilterGenre] = useState('');
   const [showSpecialtyOnly, setShowSpecialtyOnly] = useState(false);
 
-  // 統計とプレイリスト
+  // モーダル表示状態
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [showBulkAddModal, setShowBulkAddModal] = useState(false);
-  const [playlists, setPlaylists] = useState([
-    { id: 1, name: '人気楽曲', songs: [], description: '最もリクエストされた楽曲' },
-    { id: 2, name: 'バラード集', songs: [], description: 'しっとりとしたバラード楽曲' }
-  ]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showMessageEditModal, setShowMessageEditModal] = useState(false);
 
-  // データの初期値（簡素化版：得意機能のみ）
+  // データの初期値
   const initialSongs = [
     { 
       id: 1, 
@@ -127,19 +122,6 @@ export default function EnhancedMusicRequestApp() {
     },
     { 
       id: 3, 
-      title: '3月9日', 
-      artist: 'レミオロメン', 
-      reading: 'さんがつここのか', 
-      genre: 'J-POP', 
-      tags: ['卒業'], 
-      memo: '', 
-      copyCount: 8,
-      isSpecialty: false,
-      createdAt: new Date('2024-02-01'),
-      lastRequested: new Date('2024-06-27')
-    },
-    { 
-      id: 4, 
       title: '夜に駆ける', 
       artist: 'YOASOBI', 
       reading: 'よるにかける', 
@@ -150,98 +132,13 @@ export default function EnhancedMusicRequestApp() {
       isSpecialty: true,
       createdAt: new Date('2024-02-10'),
       lastRequested: new Date('2024-06-27')
-    },
-    { 
-      id: 5, 
-      title: '紅蓮華', 
-      artist: 'LiSA', 
-      reading: 'ぐれんげ', 
-      genre: 'アニソン', 
-      tags: ['アニソン'], 
-      memo: '鬼滅の刃主題歌', 
-      copyCount: 12,
-      isSpecialty: false,
-      createdAt: new Date('2024-02-15'),
-      lastRequested: new Date('2024-06-26')
     }
   ];
 
-  // Firebaseストレージ操作関数
-  const saveToFirestore = async (collection, data) => {
-    try {
-      if (!db) {
-        console.log('Firestore not available, using localStorage');
-        return await saveToLocalStorage(collection, data);
-      }
-      
-      console.log(`Saving to Firestore collection: ${collection}`);
-      
-      // Firestoreに保存
-      await db.collection('musicApp').doc(collection).set({
-        data: data,
-        updatedAt: new Date(),
-        version: 1
-      });
-      
-      console.log(`[Firestore] Data saved to ${collection}:`, data);
-      
-      // ローカルストレージにもバックアップ保存
-      await saveToLocalStorage(collection, data);
-      
-      return { success: true, source: 'firestore' };
-    } catch (error) {
-      console.error('Firestore save error:', error);
-      // エラー時はローカルストレージにフォールバック
-      const result = await saveToLocalStorage(collection, data);
-      return { ...result, source: 'localStorage' };
-    }
-  };
-
-  const loadFromFirestore = async (collection, defaultValue) => {
-    try {
-      if (!db) {
-        console.log('Firestore not available, using localStorage');
-        return await loadFromLocalStorage(collection, defaultValue);
-      }
-      
-      console.log(`Loading from Firestore collection: ${collection}`);
-      
-      // Firestoreから読み込み
-      const doc = await db.collection('musicApp').doc(collection).get();
-      
-      if (doc.exists) {
-        const firestoreData = doc.data().data;
-        console.log(`[Firestore] Data loaded from ${collection}:`, firestoreData);
-        
-        // ローカルストレージにもキャッシュ保存
-        await saveToLocalStorage(collection, firestoreData);
-        
-        return firestoreData;
-      } else {
-        console.log(`No data found in Firestore for ${collection}, checking localStorage`);
-        // Firestoreにデータがない場合はローカルストレージから読み込み
-        const localData = await loadFromLocalStorage(collection, defaultValue);
-        
-        // ローカルにデータがあればFirestoreに同期
-        if (localData !== defaultValue) {
-          console.log(`Syncing localStorage data to Firestore for ${collection}`);
-          await saveToFirestore(collection, localData);
-        }
-        
-        return localData;
-      }
-    } catch (error) {
-      console.error('Firestore load error:', error);
-      // エラー時はローカルストレージから読み込み
-      return await loadFromLocalStorage(collection, defaultValue);
-    }
-  };
-
-  // ローカルストレージ操作関数（バックアップ用）
+  // ローカルストレージ操作関数
   const saveToLocalStorage = async (key, data) => {
     try {
       localStorage.setItem(`musicApp_${key}`, JSON.stringify(data));
-      console.log(`[LocalStorage] Data saved to ${key}:`, data);
       return { success: true };
     } catch (error) {
       console.error('LocalStorage save error:', error);
@@ -253,11 +150,8 @@ export default function EnhancedMusicRequestApp() {
     try {
       const stored = localStorage.getItem(`musicApp_${key}`);
       if (stored) {
-        const data = JSON.parse(stored);
-        console.log(`[LocalStorage] Data loaded from ${key}:`, data);
-        return data;
+        return JSON.parse(stored);
       }
-      console.log(`[LocalStorage] No data found for ${key}, using default:`, defaultValue);
       return defaultValue;
     } catch (error) {
       console.error('LocalStorage load error:', error);
@@ -265,17 +159,61 @@ export default function EnhancedMusicRequestApp() {
     }
   };
 
-  // 楽曲データ状態（既存機能保持）
+  // Firebaseストレージ操作関数
+  const saveToFirestore = async (collection, data) => {
+    try {
+      if (!db) {
+        return await saveToLocalStorage(collection, data);
+      }
+      
+      await db.collection('musicApp').doc(collection).set({
+        data: data,
+        updatedAt: new Date(),
+        version: 1
+      });
+      
+      await saveToLocalStorage(collection, data);
+      return { success: true, source: 'firestore' };
+    } catch (error) {
+      console.error('Firestore save error:', error);
+      const result = await saveToLocalStorage(collection, data);
+      return { ...result, source: 'localStorage' };
+    }
+  };
+
+  const loadFromFirestore = async (collection, defaultValue) => {
+    try {
+      if (!db) {
+        return await loadFromLocalStorage(collection, defaultValue);
+      }
+      
+      const doc = await db.collection('musicApp').doc(collection).get();
+      
+      if (doc.exists) {
+        const firestoreData = doc.data().data;
+        await saveToLocalStorage(collection, firestoreData);
+        return firestoreData;
+      } else {
+        const localData = await loadFromLocalStorage(collection, defaultValue);
+        if (localData !== defaultValue) {
+          await saveToFirestore(collection, localData);
+        }
+        return localData;
+      }
+    } catch (error) {
+      console.error('Firestore load error:', error);
+      return await loadFromLocalStorage(collection, defaultValue);
+    }
+  };
+
+  // 楽曲データ状態
   const [songs, setSongs] = useState(initialSongs);
   const [publishedSongs, setPublishedSongs] = useState(initialSongs);
   const [adminMessage, setAdminMessage] = useState('配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪');
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedSong, setCopiedSong] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [editingSong, setEditingSong] = useState(null);
-  const [showMessageEditModal, setShowMessageEditModal] = useState(false);
   const [tempAdminMessage, setTempAdminMessage] = useState('');
   const [newSong, setNewSong] = useState({
     title: '',
@@ -288,7 +226,7 @@ export default function EnhancedMusicRequestApp() {
   const [bulkSongText, setBulkSongText] = useState('');
   const [availableGenres] = useState(['J-POP', 'アニソン', 'ロック', 'バラード', '演歌', 'クラシック', 'ボカロ', 'インスト']);
 
-  // テーマ設定（既存機能保持）
+  // テーマ設定
   const currentTheme = isDarkMode ? {
     background: 'bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900',
     card: 'bg-white/10 backdrop-blur-md border-white/20',
@@ -321,14 +259,11 @@ export default function EnhancedMusicRequestApp() {
       const result = await saveToFirestore('songs', songsData);
       setSongs(songsData);
       
-      // 接続状態を更新
       if (result.source === 'firestore') {
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
       }
-      
-      console.log('Songs saved and state updated:', songsData);
     } catch (error) {
       console.error('Error saving songs:', error);
       setFirebaseConnected(false);
@@ -340,14 +275,11 @@ export default function EnhancedMusicRequestApp() {
       const result = await saveToFirestore('publishedSongs', publishedData);
       setPublishedSongs(publishedData);
       
-      // 接続状態を更新
       if (result.source === 'firestore') {
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
       }
-      
-      console.log('Published songs saved and state updated:', publishedData);
     } catch (error) {
       console.error('Error saving published songs:', error);
       setFirebaseConnected(false);
@@ -359,14 +291,11 @@ export default function EnhancedMusicRequestApp() {
       const result = await saveToFirestore('adminMessage', message);
       setAdminMessage(message);
       
-      // 接続状態を更新
       if (result.source === 'firestore') {
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
       }
-      
-      console.log('Admin message saved:', message);
     } catch (error) {
       console.error('Error saving admin message:', error);
       setFirebaseConnected(false);
@@ -378,88 +307,53 @@ export default function EnhancedMusicRequestApp() {
       const result = await saveToFirestore('isDarkMode', darkMode);
       setIsDarkMode(darkMode);
       
-      // 接続状態を更新
       if (result.source === 'firestore') {
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
       }
-      
-      console.log('Dark mode saved:', darkMode);
     } catch (error) {
       console.error('Error saving dark mode:', error);
       setFirebaseConnected(false);
     }
   };
 
-  // プレイリスト保存
-  const savePlaylistsToStorage = async (playlistData) => {
-    try {
-      const result = await saveToFirestore('playlists', playlistData);
-      setPlaylists(playlistData);
-      
-      // 接続状態を更新
-      if (result.source === 'firestore') {
-        setFirebaseConnected(true);
-        setDatabaseConnected(true);
-        setLastSyncTime(new Date());
-      }
-      
-      console.log('Playlists saved:', playlistData);
-    } catch (error) {
-      console.error('Error saving playlists:', error);
-      setFirebaseConnected(false);
-    }
-  };
-
-  // 初期化（Firebase + ローカルストレージ対応）
+  // 初期化
   useEffect(() => {
     const init = async () => {
       setLoadingFirebase(true);
       
       try {
-        // Firebaseを初期化
         const firebaseInitialized = await initializeFirebase();
         
         if (firebaseInitialized) {
-          console.log('[Firebase] Initialization successful');
           setFirebaseConnected(true);
           setDatabaseConnected(true);
         } else {
-          console.log('[Firebase] Initialization failed, using localStorage only');
           setFirebaseConnected(false);
           setDatabaseConnected(false);
         }
 
-        // データを読み込み（Firestore優先、フォールバックでローカルストレージ）
-        const [loadedSongs, loadedPublished, loadedMessage, loadedDarkMode, loadedPlaylists] = await Promise.all([
+        const [loadedSongs, loadedPublished, loadedMessage, loadedDarkMode] = await Promise.all([
           loadFromFirestore('songs', initialSongs),
           loadFromFirestore('publishedSongs', initialSongs),
           loadFromFirestore('adminMessage', '配信をご視聴いただき、ありがとうございます！リクエストお待ちしております♪'),
-          loadFromFirestore('isDarkMode', true),
-          loadFromFirestore('playlists', [
-            { id: 1, name: '人気楽曲', songs: [], description: '最もリクエストされた楽曲' },
-            { id: 2, name: 'バラード集', songs: [], description: 'しっとりとしたバラード楽曲' }
-          ])
+          loadFromFirestore('isDarkMode', true)
         ]);
 
         setSongs(loadedSongs);
         setPublishedSongs(loadedPublished);
         setAdminMessage(loadedMessage);
         setIsDarkMode(loadedDarkMode);
-        setPlaylists(loadedPlaylists);
 
         if (firebaseInitialized) {
           setLastSyncTime(new Date());
         }
-        
-        console.log('[Storage] Initialization completed successfully');
       } catch (error) {
-        console.error('[Storage] Initialization error:', error);
+        console.error('Initialization error:', error);
         setFirebaseConnected(false);
         setDatabaseConnected(false);
         
-        // エラー時は初期データを使用
         setSongs(initialSongs);
         setPublishedSongs(initialSongs);
       }
@@ -468,13 +362,13 @@ export default function EnhancedMusicRequestApp() {
     };
     
     init();
-  }, []); // 空の依存配列で初回のみ実行
+  }, []);
 
-  // 計算プロパティ（強化版）
+  // 計算プロパティ
   const displayedSongs = isAdmin ? songs : publishedSongs;
   const topSongs = displayedSongs.filter(song => song.copyCount > 0).sort((a, b) => b.copyCount - a.copyCount).slice(0, 3);
   
-  // 強化された検索・フィルター・ソート機能
+  // 検索・フィルター・ソート機能
   const getFilteredAndSortedSongs = () => {
     let filtered = displayedSongs.filter(song => {
       const matchesSearch = searchTerm === '' || 
@@ -491,7 +385,6 @@ export default function EnhancedMusicRequestApp() {
       return matchesSearch && matchesGenre && matchesSpecialty;
     });
 
-    // ソート機能
     filtered.sort((a, b) => {
       let aValue, bValue;
       
@@ -548,7 +441,7 @@ export default function EnhancedMusicRequestApp() {
     };
   };
 
-  // イベントハンドラー（既存機能保持）
+  // イベントハンドラー
   const copyToClipboard = async (song) => {
     const requestText = `♪ ${song.title} - ${song.artist}`;
     try {
@@ -578,7 +471,6 @@ export default function EnhancedMusicRequestApp() {
     }
   };
 
-  // 得意機能
   const toggleSpecialty = async (songId) => {
     const updatedSongs = songs.map(song => 
       song.id === songId ? { ...song, isSpecialty: !song.isSpecialty } : song
@@ -586,7 +478,6 @@ export default function EnhancedMusicRequestApp() {
     await saveSongsToStorage(updatedSongs);
   };
 
-  // 既存のイベントハンドラー（保持）
   const handleAdminToggle = () => {
     if (isAdmin) {
       setIsAdmin(false);
@@ -639,13 +530,11 @@ export default function EnhancedMusicRequestApp() {
         memo: ''
       });
       setShowAddModal(false);
-      console.log('[LocalStorage] Song added successfully:', songToAdd);
     } catch (error) {
-      console.error('[LocalStorage] Error adding song:', error);
+      console.error('Error adding song:', error);
     }
   };
 
-  // 一括追加機能
   const addBulkSongs = async () => {
     if (!bulkSongText.trim()) return;
     
@@ -654,18 +543,16 @@ export default function EnhancedMusicRequestApp() {
       const newSongs = [];
       let maxId = Math.max(...songs.map(s => s.id), 0);
       
-      lines.forEach((line, index) => {
+      lines.forEach((line) => {
         const trimmedLine = line.trim();
         if (!trimmedLine) return;
         
-        // 形式: "楽曲名 - アーティスト名" または "楽曲名,アーティスト名"
         let title, artist;
         if (trimmedLine.includes(' - ')) {
           [title, artist] = trimmedLine.split(' - ').map(s => s.trim());
         } else if (trimmedLine.includes(',')) {
           [title, artist] = trimmedLine.split(',').map(s => s.trim());
         } else {
-          // アーティスト名がない場合は楽曲名のみ
           title = trimmedLine;
           artist = '不明';
         }
@@ -693,10 +580,9 @@ export default function EnhancedMusicRequestApp() {
         await saveSongsToStorage(updatedSongs);
         setBulkSongText('');
         setShowBulkAddModal(false);
-        console.log(`[LocalStorage] ${newSongs.length} songs added successfully`);
       }
     } catch (error) {
-      console.error('[LocalStorage] Error adding bulk songs:', error);
+      console.error('Error adding bulk songs:', error);
     }
   };
 
@@ -761,31 +647,6 @@ export default function EnhancedMusicRequestApp() {
               ))}
             </div>
           </div>
-
-          <div className="mb-6">
-            <h4 className="text-lg font-bold text-gray-800 mb-3">人気楽曲 TOP5</h4>
-            <div className="space-y-2">
-              {displayedSongs
-                .filter(song => song.copyCount > 0)
-                .sort((a, b) => b.copyCount - a.copyCount)
-                .slice(0, 5)
-                .map((song, index) => (
-                  <div key={song.id} className="flex items-center justify-between bg-gray-50 rounded p-3">
-                    <div className="flex items-center space-x-3">
-                      <span className="font-bold text-lg text-gray-500">#{index + 1}</span>
-                      <div>
-                        <div className="font-medium text-gray-800">{song.title}</div>
-                        <div className="text-sm text-gray-600">{song.artist}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {song.isSpecialty && <span className="text-orange-500 text-xs">★得意</span>}
-                      <span className="text-sm text-gray-600">{song.copyCount}回</span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -817,7 +678,25 @@ export default function EnhancedMusicRequestApp() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {/* 統計ボタン */}
+              {/* Firebase接続状態 */}
+              <div className="flex items-center space-x-1">
+                {firebaseConnected ? (
+                  <Wifi className="w-4 h-4 text-green-400" title="Firebase接続済み" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-red-400" title="Firebase未接続" />
+                )}
+                {databaseConnected ? (
+                  <Database className="w-4 h-4 text-green-400" title="データベース接続済み" />
+                ) : (
+                  <Database className="w-4 h-4 text-red-400" title="データベース未接続" />
+                )}
+                {lastSyncTime && (
+                  <span className={`text-xs ${currentTheme.textTertiary}`}>
+                    {lastSyncTime.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+
               <button
                 onClick={() => setShowStatsModal(true)}
                 className={`p-2 ${isDarkMode ? 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-300' : 'bg-blue-500/30 hover:bg-blue-500/50 text-blue-600'} rounded transition-colors`}
@@ -939,7 +818,6 @@ export default function EnhancedMusicRequestApp() {
 
         {/* 検索・フィルター機能 */}
         <div className={`${currentTheme.card} rounded-lg p-3 mb-3 border space-y-3`}>
-          {/* 検索バー */}
           <div className="relative">
             <Search className={`absolute left-2 top-2 w-4 h-4 ${isDarkMode ? 'text-white/50' : 'text-gray-400'}`} />
             <input
@@ -951,7 +829,6 @@ export default function EnhancedMusicRequestApp() {
             />
           </div>
 
-          {/* フィルター・ソート */}
           <div className="flex flex-wrap gap-2 items-center">
             <div className="flex items-center space-x-2">
               <Filter className={`w-4 h-4 ${currentTheme.icon}`} />
@@ -999,7 +876,7 @@ export default function EnhancedMusicRequestApp() {
           </div>
         </div>
 
-        {/* 楽曲リスト（テーブル表示のみ） */}
+        {/* 楽曲リスト */}
         <div className={`${currentTheme.card} rounded-lg border overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -1114,7 +991,7 @@ export default function EnhancedMusicRequestApp() {
           )}
         </div>
 
-        {/* 統計モーダル */}
+        {/* モーダル類 */}
         {showStatsModal && <StatsModal />}
 
         {/* パスワードモーダル */}
@@ -1204,17 +1081,6 @@ export default function EnhancedMusicRequestApp() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
-                  <input
-                    type="text"
-                    value={newSong.reading || ''}
-                    onChange={(e) => setNewSong({...newSong, reading: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="よみがなを入力"
-                  />
-                </div>
-                
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
                   <input
                     type="text"
@@ -1237,17 +1103,6 @@ export default function EnhancedMusicRequestApp() {
                       <option key={genre} value={genre}>{genre}</option>
                     ))}
                   </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
-                  <input
-                    type="text"
-                    value={Array.isArray(newSong.tags) ? newSong.tags.join(', ') : ''}
-                    onChange={(e) => setNewSong({...newSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="タグをカンマ区切りで入力"
-                  />
                 </div>
                 
                 <div>
@@ -1298,7 +1153,7 @@ export default function EnhancedMusicRequestApp() {
                     value={bulkSongText}
                     onChange={(e) => setBulkSongText(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="例:&#10;紅蓮華 - LiSA&#10;夜に駆ける - YOASOBI&#10;Pretender - Official髭男dism"
+                    placeholder="例:&#10;紅蓮華 - LiSA&#10;夜に駆ける - YOASOBI"
                     rows="10"
                   />
                 </div>
@@ -1377,17 +1232,6 @@ export default function EnhancedMusicRequestApp() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">読み仮名</label>
-                  <input
-                    type="text"
-                    value={editingSong.reading || ''}
-                    onChange={(e) => setEditingSong({...editingSong, reading: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="よみがなを入力"
-                  />
-                </div>
-                
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">アーティスト名 *</label>
                   <input
                     type="text"
@@ -1413,19 +1257,46 @@ export default function EnhancedMusicRequestApp() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">タグ</label>
-                  <input
-                    type="text"
-                    value={Array.isArray(editingSong.tags) ? editingSong.tags.join(', ') : ''}
-                    onChange={(e) => setEditingSong({...editingSong, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="タグをカンマ区切りで入力"
-                  />
-                </div>
-                
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
                   <textarea
                     value={editingSong.memo || ''}
                     onChange={(e) => setEditingSong({...editingSong, memo: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="メモを入力"
+                    rows="2"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={async () => {
+                    if (!editingSong.title || !editingSong.artist) return;
+                    const updatedSongs = songs.map(song => song.id === editingSong.id ? {...song, ...editingSong} : song);
+                    await saveSongsToStorage(updatedSongs);
+                    setShowEditModal(false);
+                    setEditingSong(null);
+                  }}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
+                  disabled={!editingSong.title || !editingSong.artist}
+                >
+                  保存
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingSong(null);
+                  }}
+                  className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm font-medium"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
