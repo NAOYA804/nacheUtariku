@@ -135,74 +135,57 @@ export default function EnhancedMusicRequestApp() {
     }
   ];
 
-  // ローカルストレージ操作関数
-  const saveToLocalStorage = async (key, data) => {
-    try {
-      localStorage.setItem(`musicApp_${key}`, JSON.stringify(data));
-      return { success: true };
-    } catch (error) {
-      console.error('LocalStorage save error:', error);
-      return { success: false, error };
-    }
-  };
-
-  const loadFromLocalStorage = async (key, defaultValue) => {
-    try {
-      const stored = localStorage.getItem(`musicApp_${key}`);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-      return defaultValue;
-    } catch (error) {
-      console.error('LocalStorage load error:', error);
-      return defaultValue;
-    }
-  };
-
-  // Firebaseストレージ操作関数
+  // Firebaseストレージ操作関数（ローカルストレージ不使用）
   const saveToFirestore = async (collection, data) => {
     try {
       if (!db) {
-        return await saveToLocalStorage(collection, data);
+        console.error('Firestore not available');
+        return { success: false, source: 'none' };
       }
       
+      console.log(`Saving to Firestore collection: ${collection}`, data);
+      
+      // Firestoreに保存
       await db.collection('musicApp').doc(collection).set({
         data: data,
         updatedAt: new Date(),
         version: 1
       });
       
-      await saveToLocalStorage(collection, data);
+      console.log(`[Firestore] Data saved to ${collection}:`, data);
+      
       return { success: true, source: 'firestore' };
     } catch (error) {
       console.error('Firestore save error:', error);
-      const result = await saveToLocalStorage(collection, data);
-      return { ...result, source: 'localStorage' };
+      return { success: false, error, source: 'error' };
     }
   };
 
   const loadFromFirestore = async (collection, defaultValue) => {
     try {
       if (!db) {
-        return await loadFromLocalStorage(collection, defaultValue);
+        console.error('Firestore not available, using default value');
+        return defaultValue;
       }
       
+      console.log(`Loading from Firestore collection: ${collection}`);
+      
+      // Firestoreから読み込み
       const doc = await db.collection('musicApp').doc(collection).get();
       
       if (doc.exists) {
         const firestoreData = doc.data().data;
-        await saveToLocalStorage(collection, firestoreData);
+        console.log(`[Firestore] Data loaded from ${collection}:`, firestoreData);
         return firestoreData;
       } else {
-        const localData = await loadFromLocalStorage(collection, defaultValue);
-        if (localData !== defaultValue) {
-          await saveToFirestore(collection, localData);
-        }
-        return localData;
+        console.log(`No data found in Firestore for ${collection}, using default`);
+        // デフォルト値をFirestoreに保存
+        await saveToFirestore(collection, defaultValue);
+        return defaultValue;
       }
     } catch (error) {
       console.error('Firestore load error:', error);
-      return await loadFromLocalStorage(collection, defaultValue);
+      return defaultValue;
     }
   };
 
@@ -253,68 +236,99 @@ export default function EnhancedMusicRequestApp() {
     inputFocus: 'focus:ring-purple-500'
   };
 
-  // データをFirestoreに保存するヘルパー関数
+  // データをFirestoreに保存するヘルパー関数（強化版）
   const saveSongsToStorage = async (songsData) => {
     try {
+      console.log('Saving songs data:', songsData);
       const result = await saveToFirestore('songs', songsData);
-      setSongs(songsData);
       
-      if (result.source === 'firestore') {
+      if (result.success) {
+        setSongs(songsData);
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
+        console.log('Songs successfully saved and state updated');
+      } else {
+        console.error('Failed to save songs to Firestore');
+        setFirebaseConnected(false);
       }
+      
+      return result;
     } catch (error) {
       console.error('Error saving songs:', error);
       setFirebaseConnected(false);
+      return { success: false, error };
     }
   };
 
   const savePublishedSongsToStorage = async (publishedData) => {
     try {
+      console.log('Saving published songs data:', publishedData);
       const result = await saveToFirestore('publishedSongs', publishedData);
-      setPublishedSongs(publishedData);
       
-      if (result.source === 'firestore') {
+      if (result.success) {
+        setPublishedSongs(publishedData);
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
+        console.log('Published songs successfully saved and state updated');
+      } else {
+        console.error('Failed to save published songs to Firestore');
+        setFirebaseConnected(false);
       }
+      
+      return result;
     } catch (error) {
       console.error('Error saving published songs:', error);
       setFirebaseConnected(false);
+      return { success: false, error };
     }
   };
 
   const saveAdminMessageToStorage = async (message) => {
     try {
+      console.log('Saving admin message:', message);
       const result = await saveToFirestore('adminMessage', message);
-      setAdminMessage(message);
       
-      if (result.source === 'firestore') {
+      if (result.success) {
+        setAdminMessage(message);
         setFirebaseConnected(true);
         setDatabaseConnected(true);
         setLastSyncTime(new Date());
+        console.log('Admin message successfully saved');
+      } else {
+        console.error('Failed to save admin message to Firestore');
+        setFirebaseConnected(false);
       }
+      
+      return result;
     } catch (error) {
       console.error('Error saving admin message:', error);
       setFirebaseConnected(false);
+      return { success: false, error };
     }
   };
 
-  const saveDarkModeToStorage = async (darkMode) => {
+  // 楽曲編集の保存処理を強化
+  const updateSong = async (updatedSong) => {
     try {
-      const result = await saveToFirestore('isDarkMode', darkMode);
-      setIsDarkMode(darkMode);
+      console.log('Updating song:', updatedSong);
+      const updatedSongs = songs.map(song => 
+        song.id === updatedSong.id ? {...song, ...updatedSong, updatedAt: new Date()} : song
+      );
       
-      if (result.source === 'firestore') {
-        setFirebaseConnected(true);
-        setDatabaseConnected(true);
-        setLastSyncTime(new Date());
+      const result = await saveSongsToStorage(updatedSongs);
+      
+      if (result.success) {
+        console.log('Song successfully updated');
+        return true;
+      } else {
+        console.error('Failed to update song');
+        return false;
       }
     } catch (error) {
-      console.error('Error saving dark mode:', error);
-      setFirebaseConnected(false);
+      console.error('Error updating song:', error);
+      return false;
     }
   };
 
@@ -810,7 +824,13 @@ export default function EnhancedMusicRequestApp() {
               <div className="text-xs text-blue-200 space-y-1">
                 <div>📊 Firebase Project: {firebaseConfig.projectId}</div>
                 <div>🔗 Status: {firebaseConnected ? 'Connected' : 'Disconnected'}</div>
+                <div>💾 Storage: Firestore Only (No LocalStorage)</div>
                 {lastSyncTime && <div>⏰ Last Sync: {lastSyncTime.toLocaleString()}</div>}
+                {!firebaseConnected && (
+                  <div className="text-red-300 text-xs mt-2">
+                    ⚠️ Firebase未接続のため、データは保存されません
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1272,10 +1292,18 @@ export default function EnhancedMusicRequestApp() {
                 <button
                   onClick={async () => {
                     if (!editingSong.title || !editingSong.artist) return;
-                    const updatedSongs = songs.map(song => song.id === editingSong.id ? {...song, ...editingSong} : song);
-                    await saveSongsToStorage(updatedSongs);
-                    setShowEditModal(false);
-                    setEditingSong(null);
+                    
+                    console.log('Attempting to save edited song:', editingSong);
+                    const success = await updateSong(editingSong);
+                    
+                    if (success) {
+                      setShowEditModal(false);
+                      setEditingSong(null);
+                      console.log('Song edit completed successfully');
+                    } else {
+                      console.error('Failed to save song edits');
+                      // ここでエラーメッセージを表示することもできます
+                    }
                   }}
                   className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
                   disabled={!editingSong.title || !editingSong.artist}
