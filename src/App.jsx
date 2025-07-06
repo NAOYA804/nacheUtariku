@@ -73,8 +73,6 @@ export default function EnhancedMusicRequestApp() {
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [firebaseConnected, setFirebaseConnected] = useState(false);
-  const [databaseConnected, setDatabaseConnected] = useState(false);
   const [loadingFirebase, setLoadingFirebase] = useState(true);
   const [showPublishMessage, setShowPublishMessage] = useState(false);
 
@@ -234,10 +232,8 @@ export default function EnhancedMusicRequestApp() {
   // データをFirestoreに保存するヘルパー関数
   const saveSongsToStorage = async (songsData) => {
     console.log('Saving songs:', songsData);
-    // 即座にstateを更新
     setSongs([...songsData]);
     
-    // Firestoreに保存は別途実行（失敗してもstateは更新済み）
     try {
       const result = await saveToFirestore('songs', songsData);
       if (result.success) {
@@ -252,24 +248,10 @@ export default function EnhancedMusicRequestApp() {
     return { success: true };
   };
 
-  const savePublishedSongsToStorage = async (publishedData) => {
-    console.log('Saving published songs:', publishedData);
-    const result = await saveToFirestore('publishedSongs', publishedData);
-    if (result.success) {
-      setPublishedSongs([...publishedData]);
-      console.log('Published songs saved successfully');
-    } else {
-      console.error('Failed to save published songs');
-    }
-    return result;
-  };
-
   const saveAdminMessageToStorage = async (message) => {
     console.log('Saving admin message:', message);
-    // 即座にstateを更新
     setAdminMessage(message);
     
-    // Firestoreに保存は別途実行（失敗してもstateは更新済み）
     try {
       const result = await saveToFirestore('adminMessage', message);
       if (result.success) {
@@ -286,10 +268,8 @@ export default function EnhancedMusicRequestApp() {
 
   const saveDarkModeToStorage = async (darkMode) => {
     console.log('Saving dark mode:', darkMode);
-    // 即座にstateを更新
     setIsDarkMode(darkMode);
     
-    // Firestoreに保存は別途実行（失敗してもstateは更新済み）
     try {
       const result = await saveToFirestore('isDarkMode', darkMode);
       if (result.success) {
@@ -322,14 +302,6 @@ export default function EnhancedMusicRequestApp() {
       
       try {
         const firebaseInitialized = await initializeFirebase();
-        
-        if (firebaseInitialized) {
-          setFirebaseConnected(true);
-          setDatabaseConnected(true);
-        } else {
-          setFirebaseConnected(false);
-          setDatabaseConnected(false);
-        }
 
         const [loadedSongs, loadedPublished, loadedMessage, loadedDarkMode] = await Promise.all([
           loadFromFirestore('songs', initialSongs),
@@ -344,9 +316,6 @@ export default function EnhancedMusicRequestApp() {
         setIsDarkMode(loadedDarkMode);
       } catch (error) {
         console.error('Initialization error:', error);
-        setFirebaseConnected(false);
-        setDatabaseConnected(false);
-        
         setSongs(initialSongs);
         setPublishedSongs(initialSongs);
       }
@@ -357,20 +326,26 @@ export default function EnhancedMusicRequestApp() {
     init();
   }, []);
 
-  // 計算プロパティ（シンプル版）
+  // 計算プロパティ
   const displayedSongs = isAdmin ? songs : publishedSongs;
   
   // 検索・フィルター・ソート機能
   const getFilteredAndSortedSongs = () => {
     let filtered = displayedSongs.filter(song => {
-      const matchesSearch = searchTerm === '' || 
-             song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             song.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             song.genre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             (song.reading && song.reading.toLowerCase().includes(searchTerm.toLowerCase())) ||
-             (song.tags && song.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))) ||
-             (song.memo && song.memo.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (searchTerm === '') return true;
       
+      const searchLower = searchTerm.toLowerCase();
+      
+      const titleMatch = song.title.toLowerCase().includes(searchLower);
+      const artistMatch = song.artist.toLowerCase().includes(searchLower);
+      const readingMatch = song.reading && song.reading.toLowerCase().includes(searchLower);
+      const genreMatch = song.genre && song.genre.toLowerCase().includes(searchLower);
+      const tagMatch = song.tags && song.tags.some(tag => 
+        tag.toLowerCase().includes(searchLower)
+      );
+      const memoMatch = song.memo && song.memo.toLowerCase().includes(searchLower);
+      
+      const matchesSearch = titleMatch || artistMatch || readingMatch || genreMatch || tagMatch || memoMatch;
       const matchesGenre = filterGenre === '' || song.genre === filterGenre;
       const matchesSpecialty = !showSpecialtyOnly || song.isSpecialty;
       
@@ -388,10 +363,6 @@ export default function EnhancedMusicRequestApp() {
         case 'artist':
           aValue = a.artist.toLowerCase();
           bValue = b.artist.toLowerCase();
-          break;
-        case 'copyCount':
-          aValue = a.copyCount || 0;
-          bValue = b.copyCount || 0;
           break;
         case 'createdAt':
           aValue = new Date(a.createdAt || 0);
@@ -422,27 +393,22 @@ export default function EnhancedMusicRequestApp() {
     const suggestions = new Set();
     
     displayedSongs.forEach(song => {
-      // 楽曲名候補
       if (song.title.toLowerCase().includes(searchLower)) {
         suggestions.add(song.title);
       }
       
-      // アーティスト名候補
       if (song.artist.toLowerCase().includes(searchLower)) {
         suggestions.add(song.artist);
       }
       
-      // 読み仮名候補
       if (song.reading && song.reading.toLowerCase().includes(searchLower)) {
         suggestions.add(song.reading);
       }
       
-      // ジャンル候補
       if (song.genre && song.genre.toLowerCase().includes(searchLower)) {
         suggestions.add(song.genre);
       }
       
-      // タグ候補
       if (song.tags) {
         song.tags.forEach(tag => {
           if (tag.toLowerCase().includes(searchLower)) {
@@ -452,12 +418,12 @@ export default function EnhancedMusicRequestApp() {
       }
     });
     
-    return Array.from(suggestions).slice(0, 5); // 最大5件の候補
+    return Array.from(suggestions).slice(0, 5);
   };
   
   const searchSuggestions = getSearchSuggestions();
 
-  // リクエスト機能（シンプル版）
+  // リクエスト機能
   const copyToClipboard = async (song) => {
     const requestText = `♪ ${song.title} - ${song.artist}`;
     try {
@@ -521,18 +487,11 @@ export default function EnhancedMusicRequestApp() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      console.log('Song to add:', songToAdd);
       
       const updatedSongs = [...songs, songToAdd];
-      console.log('Updated songs array:', updatedSongs);
-      
-      // 即座にstateを更新
       setSongs(updatedSongs);
-      
-      // Firestoreに保存（バックグラウンド）
       await saveToFirestore('songs', updatedSongs);
       
-      // フォームをリセット
       setNewSong({ 
         title: '', 
         artist: '', 
@@ -552,7 +511,6 @@ export default function EnhancedMusicRequestApp() {
     if (!bulkSongText.trim()) return;
     
     try {
-      console.log('Adding bulk songs from text:', bulkSongText);
       const lines = bulkSongText.trim().split('\n');
       const newSongs = [];
       let maxId = Math.max(...songs.map(s => s.id), 0);
@@ -590,14 +548,8 @@ export default function EnhancedMusicRequestApp() {
       });
       
       if (newSongs.length > 0) {
-        console.log('New songs to add:', newSongs);
         const updatedSongs = [...songs, ...newSongs];
-        console.log('Updated songs array:', updatedSongs);
-        
-        // 即座にstateを更新
         setSongs(updatedSongs);
-        
-        // Firestoreに保存（バックグラウンド）
         await saveToFirestore('songs', updatedSongs);
         
         setBulkSongText('');
@@ -611,28 +563,18 @@ export default function EnhancedMusicRequestApp() {
 
   const publishSongs = async () => {
     console.log('Publishing songs...');
-    console.log('Current songs to publish:', songs);
-    
-    // 即座にstateを更新
     setPublishedSongs([...songs]);
-    
-    // 公開メッセージを表示
     setShowPublishMessage(true);
     setTimeout(() => setShowPublishMessage(false), 3000);
     
-    // Firestoreに保存（バックグラウンド）
     try {
       const result = await saveToFirestore('publishedSongs', songs);
       if (result.success) {
         console.log('Published songs saved to Firestore successfully');
-      } else {
-        console.error('Failed to save published songs to Firestore');
       }
     } catch (error) {
       console.error('Error saving published songs:', error);
     }
-    
-    console.log('Songs published successfully');
   };
 
   if (loadingFirebase) {
@@ -766,9 +708,33 @@ export default function EnhancedMusicRequestApp() {
               type="text"
               placeholder="楽曲名、アーティスト名、読み仮名、タグで検索..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowSearchSuggestions(e.target.value.length > 0);
+              }}
+              onFocus={() => setShowSearchSuggestions(searchTerm.length > 0)}
+              onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
               className={`w-full pl-8 pr-3 py-2 ${currentTheme.inputBg} border rounded ${currentTheme.inputText} focus:outline-none focus:ring-2 ${currentTheme.inputFocus} text-sm`}
             />
+            
+            {/* 検索候補 */}
+            {showSearchSuggestions && searchSuggestions.length > 0 && (
+              <div className={`absolute top-full left-0 right-0 mt-1 ${currentTheme.card} border rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto`}>
+                {searchSuggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setSearchTerm(suggestion);
+                      setShowSearchSuggestions(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm ${currentTheme.textSecondary} hover:bg-white/10 first:rounded-t-lg last:rounded-b-lg`}
+                  >
+                    <Search className="w-3 h-3 inline mr-2 opacity-50" />
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
